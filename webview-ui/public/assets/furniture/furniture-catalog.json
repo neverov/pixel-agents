@@ -1,0 +1,111 @@
+{
+  "totalAssets": 8,
+  "assets": [
+    {
+      "id": "desk",
+      "name": "DEFAULT_DESK",
+      "label": "Desk",
+      "category": "desks",
+      "file": "furniture/desks/DEFAULT_DESK.png",
+      "width": 32,
+      "height": 32,
+      "footprintW": 2,
+      "footprintH": 2,
+      "isDesk": true,
+      "canPlaceOnWalls": false
+    },
+    {
+      "id": "bookshelf",
+      "name": "DEFAULT_BOOKSHELF",
+      "label": "Bookshelf",
+      "category": "storage",
+      "file": "furniture/storage/DEFAULT_BOOKSHELF.png",
+      "width": 16,
+      "height": 32,
+      "footprintW": 1,
+      "footprintH": 2,
+      "isDesk": false,
+      "canPlaceOnWalls": false
+    },
+    {
+      "id": "plant",
+      "name": "DEFAULT_PLANT",
+      "label": "Plant",
+      "category": "decor",
+      "file": "furniture/decor/DEFAULT_PLANT.png",
+      "width": 16,
+      "height": 24,
+      "footprintW": 1,
+      "footprintH": 1,
+      "isDesk": false,
+      "canPlaceOnWalls": false
+    },
+    {
+      "id": "cooler",
+      "name": "DEFAULT_COOLER",
+      "label": "Cooler",
+      "category": "misc",
+      "file": "furniture/misc/DEFAULT_COOLER.png",
+      "width": 16,
+      "height": 24,
+      "footprintW": 1,
+      "footprintH": 1,
+      "isDesk": false,
+      "canPlaceOnWalls": false
+    },
+    {
+      "id": "whiteboard",
+      "name": "DEFAULT_WHITEBOARD",
+      "label": "Whiteboard",
+      "category": "wall",
+      "file": "furniture/wall/DEFAULT_WHITEBOARD.png",
+      "width": 32,
+      "height": 16,
+      "footprintW": 2,
+      "footprintH": 1,
+      "isDesk": false,
+      "canPlaceOnWalls": true
+    },
+    {
+      "id": "chair",
+      "name": "DEFAULT_CHAIR",
+      "label": "Chair",
+      "category": "chairs",
+      "file": "furniture/chairs/DEFAULT_CHAIR.png",
+      "width": 16,
+      "height": 16,
+      "footprintW": 1,
+      "footprintH": 1,
+      "isDesk": false,
+      "canPlaceOnWalls": false
+    },
+    {
+      "id": "pc",
+      "name": "DEFAULT_PC",
+      "label": "Monitor",
+      "category": "electronics",
+      "file": "furniture/electronics/DEFAULT_PC.png",
+      "width": 16,
+      "height": 16,
+      "footprintW": 1,
+      "footprintH": 1,
+      "isDesk": false,
+      "canPlaceOnWalls": false,
+      "canPlaceOnSurfaces": true
+    },
+    {
+      "id": "lamp",
+      "name": "DEFAULT_LAMP",
+      "label": "Lamp",
+      "category": "decor",
+      "file": "furniture/decor/DEFAULT_LAMP.png",
+      "width": 16,
+      "height": 16,
+      "footprintW": 1,
+      "footprintH": 1,
+      "isDesk": false,
+      "canPlaceOnWalls": false,
+      "canPlaceOnSurfaces": true
+    }
+  ]
+}

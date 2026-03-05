@@ -3,11 +3,15 @@ import * as path from 'path';
 import * as os from 'os';
 import type { AgentState } from './types.js';
 import { startFileWatching, readNewLines } from './fileWatcher.js';
+import { removeAgent } from './agentManager.js';
 import { SESSION_SCAN_INTERVAL_MS, SESSION_ACTIVE_THRESHOLD_MS } from './constants.js';
+
+/** How long after last write before an external session is considered closed */
+const STALE_THRESHOLD_MS = 5 * 60_000;
 
 /**
  * Scan ~/.claude/projects/ for existing JSONL sessions and create agents for active ones.
- * "Active" = file modified within SESSION_ACTIVE_THRESHOLD_MS.
+ * Also removes external agents whose sessions have gone stale.
  */
 export function startSessionScanner(
 	nextAgentIdRef: { current: number },
@@ -17,24 +21,52 @@ export function startSessionScanner(
 	pollingTimers: Map<number, ReturnType<typeof setInterval>>,
 	waitingTimers: Map<number, ReturnType<typeof setTimeout>>,
 	permissionTimers: Map<number, ReturnType<typeof setTimeout>>,
+	jsonlPollTimers: Map<number, ReturnType<typeof setInterval>>,
 	emit: (msg: unknown) => void,
 	persistAgents: () => void,
 ): ReturnType<typeof setInterval> {
-	// Run immediately on startup
-	scanAllProjects(
-		nextAgentIdRef, agents, knownJsonlFiles,
-		fileWatchers, pollingTimers, waitingTimers, permissionTimers,
-		emit, persistAgents,
-	);
-
-	// Then periodically
-	return setInterval(() => {
+	const scan = () => {
+		cleanupStaleAgents(agents, knownJsonlFiles, fileWatchers, pollingTimers, waitingTimers, permissionTimers, jsonlPollTimers, emit, persistAgents);
 		scanAllProjects(
 			nextAgentIdRef, agents, knownJsonlFiles,
 			fileWatchers, pollingTimers, waitingTimers, permissionTimers,
 			emit, persistAgents,
 		);
-	}, SESSION_SCAN_INTERVAL_MS);
+	};
+
+	scan();
+	return setInterval(scan, SESSION_SCAN_INTERVAL_MS);
+}
+
+/** Remove external agents whose JSONL files haven't been written to recently */
+function cleanupStaleAgents(
+	agents: Map<number, AgentState>,
+	knownJsonlFiles: Set<string>,
+	fileWatchers: Map<number, fs.FSWatcher>,
+	pollingTimers: Map<number, ReturnType<typeof setInterval>>,
+	waitingTimers: Map<number, ReturnType<typeof setTimeout>>,
+	permissionTimers: Map<number, ReturnType<typeof setTimeout>>,
+	jsonlPollTimers: Map<number, ReturnType<typeof setInterval>>,
+	emit: (msg: unknown) => void,
+	persistAgents: () => void,
+): void {
+	const now = Date.now();
+	for (const [id, agent] of agents) {
+		if (!agent.isExternal) continue;
+
+		try {
+			const stat = fs.statSync(agent.jsonlFile);
+			const age = now - stat.mtimeMs;
+			if (age < STALE_THRESHOLD_MS) continue;
+		} catch {
+			// File gone — remove agent
+		}
+
+		console.log(`[SessionScanner] Removing stale session: ${path.basename(agent.jsonlFile)}`);
+		knownJsonlFiles.delete(agent.jsonlFile);
+		removeAgent(id, agents, fileWatchers, pollingTimers, waitingTimers, permissionTimers, jsonlPollTimers, persistAgents);
+		emit({ type: 'agentClosed', id });
+	}
 }
 
 /** Decode Claude's project dir encoding (e.g. "-Users-bob-my-project" → "my-project") */

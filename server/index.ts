@@ -172,7 +172,7 @@ restoreAgents(
 sessionScanTimer = startSessionScanner(
 	nextAgentIdRef, agents, knownJsonlFiles,
 	fileWatchers, pollingTimers, waitingTimers, permissionTimers,
-	broadcast, persistAgents,
+	jsonlPollTimers, broadcast, persistAgents,
 );
 
 // -- Start server --
