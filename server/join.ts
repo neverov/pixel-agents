@@ -89,7 +89,7 @@ function generateAgentName(): string {
 	for (let i = 0; i < 100; i++) {
 		const adj = ADJECTIVES[Math.floor(Math.random() * ADJECTIVES.length)];
 		const noun = NOUNS[Math.floor(Math.random() * NOUNS.length)];
-		const name = `${adj} ${noun}`;
+		const name = adj[0].toUpperCase() + adj.slice(1) + ' ' + noun[0].toUpperCase() + noun.slice(1);
 		if (!usedNames.has(name)) {
 			usedNames.add(name);
 			return name;

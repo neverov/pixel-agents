@@ -78,7 +78,10 @@ export function AgentLabels({
           dotColor = '#3794ff'
         }
 
-        const labelText = subLabelMap.get(id) || ch.folderName || `Agent #${id}`
+        const rawLabel = subLabelMap.get(id) || ch.folderName || `Agent #${id}`
+        const colonIdx = rawLabel.indexOf(': ')
+        const agentName = colonIdx >= 0 ? rawLabel.slice(colonIdx + 2) : rawLabel
+        const peerName = colonIdx >= 0 ? rawLabel.slice(0, colonIdx) : null
 
         return (
           <div
@@ -121,8 +124,22 @@ export function AgentLabels({
                 textOverflow: isSub ? 'ellipsis' : undefined,
               }}
             >
-              {labelText}
+              {agentName}
             </span>
+            {peerName && !isSub && (
+              <span
+                style={{
+                  fontSize: '14px',
+                  color: 'var(--pixel-text-dim)',
+                  background: 'rgba(30,30,46,0.7)',
+                  padding: '0px 4px',
+                  borderRadius: 2,
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {peerName}
+              </span>
+            )}
           </div>
         )
       })}
