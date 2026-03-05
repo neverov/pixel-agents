@@ -17,7 +17,7 @@ This project is licensed under the [MIT License](LICENSE), so your contributions
 git clone https://github.com/pablodelucca/pixel-agents.git
 cd pixel-agents
 npm install
-cd webview-ui && npm install && cd ..
+cd ui && npm install && cd ..
 npm run build
 ```
 
@@ -40,7 +40,7 @@ This starts parallel watchers for both the extension backend (esbuild) and TypeS
 | Directory | Description |
 |---|---|
 | `src/` | Extension backend — Node.js, VS Code API |
-| `webview-ui/` | React + TypeScript frontend (separate Vite project) |
+| `ui/` | React + TypeScript frontend (separate Vite project) |
 | `scripts/` | Asset extraction and generation tooling |
 | `assets/` | Bundled sprites, catalog, and default layout |
 
@@ -50,8 +50,8 @@ This starts parallel watchers for both the extension backend (esbuild) and TypeS
 **No unused locals or parameters** (`noUnusedLocals` and `noUnusedParameters` are enabled): All magic numbers and strings are centralized — don't add inline constants to source files:
 
 - **Extension backend:** `src/constants.ts`
-- **Webview:** `webview-ui/src/constants.ts`
-- **CSS variables:** `webview-ui/src/index.css` `:root` block (`--pixel-*` properties)
+- **Webview:** `ui/src/constants.ts`
+- **CSS variables:** `ui/src/index.css` `:root` block (`--pixel-*` properties)
 
 ### UI Styling
 

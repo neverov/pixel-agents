@@ -4,7 +4,7 @@ A multiplayer pixel art office where your AI coding agents come to life as anima
 
 Multiple people can join the same office from different machines, making it a shared space where your whole team's agents are visible at once.
 
-![Pixel Agents screenshot](webview-ui/public/Screenshot.jpg)
+![Pixel Agents screenshot](ui/public/Screenshot.jpg)
 
 ## Features
 
@@ -21,7 +21,7 @@ Multiple people can join the same office from different machines, making it a sh
 - **Diverse characters** — 6 diverse character skins with automatic palette assignment. Based on [JIK-A-4, Metro City](https://jik-a-4.itch.io/metrocity-free-topdown-character-pack).
 
 <p align="center">
-  <img src="webview-ui/public/characters.png" alt="Pixel Office characters" width="320" height="72" style="image-rendering: pixelated;">
+  <img src="ui/public/characters.png" alt="Pixel Office characters" width="320" height="72" style="image-rendering: pixelated;">
 </p>
 
 ## Requirements
@@ -132,7 +132,7 @@ server/           Node.js backend (Express, WS)
 cli/              Peer CLI (separate package)
   join.ts         Connects local Claude sessions to a remote server
 
-webview-ui/       React + Vite frontend
+ui/       React + Vite frontend
   src/
     serverApi.ts  WS + REST client
     assetLoader.ts  Browser-side PNG -> sprite loading

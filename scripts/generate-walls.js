@@ -235,7 +235,7 @@ for (let mask = 0; mask < 16; mask++) {
 }
 
 // Save
-const outPath = path.join(__dirname, '..', 'webview-ui', 'public', 'assets', 'walls.png');
+const outPath = path.join(__dirname, '..', 'ui', 'public', 'assets', 'walls.png');
 const buffer = PNG.sync.write(png);
 fs.writeFileSync(outPath, buffer);
 

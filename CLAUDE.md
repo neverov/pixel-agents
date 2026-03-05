@@ -19,7 +19,7 @@ server/                       — Node.js backend (Express, WS, node-pty)
   settingsStore.ts            — Settings + agent persistence at ~/.pixel-agents/settings.json and agents.json
   types.ts                    — AgentState (has ptyProcess: IPty | null, isExternal flag), PersistedAgent
 
-webview-ui/src/               — React + TypeScript (Vite)
+ui/src/               — React + TypeScript (Vite)
   constants.ts                — All webview magic numbers/strings (grid, animation, rendering, camera, zoom, editor, game logic, notification sound)
   serverApi.ts                — WebSocket + REST client with auto-reconnect. Routes CRUD to REST, real-time events via WS
   assetLoader.ts              — Browser-side PNG->SpriteData. HTML Image + canvas getImageData (not pngjs)
@@ -99,13 +99,13 @@ JSONL transcripts at `~/.claude/projects/<project-hash>/<session-id>.jsonl`. Pro
 - `settings.json` — Sound enabled, agent seats
 - `agents.json` — Persisted agents for restore (includes palette/hueShift/seatId)
 
-`layoutPersistence.ts` handles layout I/O: `readLayoutFromFile()`, `writeLayoutToFile()`, `loadLayout()` (checks file -> falls back to bundled default), `watchLayoutFile()` (hybrid `fs.watch` + polling for cross-instance sync). On save, `markOwnWrite()` prevents the watcher from re-reading our own write. External changes broadcast `layoutLoaded` via WS. On startup: `restoreAgents()` matches persisted entries to detected sessions. **Default layout**: When no saved layout file exists, `default-layout.json` from `webview-ui/dist/assets/` is loaded and written to the file. If that also doesn't exist, `createDefaultLayout()` generates a basic office. **Export/Import**: Settings modal offers Export Layout (download JSON file) and Import Layout (file picker -> validates `version: 1` + `tiles` array -> saves to layout file + broadcasts `layoutLoaded`).
+`layoutPersistence.ts` handles layout I/O: `readLayoutFromFile()`, `writeLayoutToFile()`, `loadLayout()` (checks file -> falls back to bundled default), `watchLayoutFile()` (hybrid `fs.watch` + polling for cross-instance sync). On save, `markOwnWrite()` prevents the watcher from re-reading our own write. External changes broadcast `layoutLoaded` via WS. On startup: `restoreAgents()` matches persisted entries to detected sessions. **Default layout**: When no saved layout file exists, `default-layout.json` from `ui/dist/assets/` is loaded and written to the file. If that also doesn't exist, `createDefaultLayout()` generates a basic office. **Export/Import**: Settings modal offers Export Layout (download JSON file) and Import Layout (file picker -> validates `version: 1` + `tiles` array -> saves to layout file + broadcasts `layoutLoaded`).
 
 ## Office UI
 
 **Rendering**: Game state in imperative `OfficeState` class (not React state). Pixel-perfect: zoom = integer device-pixels-per-sprite-pixel (1x-10x). No `ctx.scale(dpr)`. Default zoom = `Math.round(2 * devicePixelRatio)`. Z-sort all entities by Y. Pan via middle-mouse drag (`panRef`). **Camera follow**: `cameraFollowId` (separate from `selectedAgentId`) smoothly centers camera on the followed agent; set on agent click, cleared on deselection or manual pan.
 
-**UI styling**: Pixel art aesthetic — all overlays use sharp corners (`borderRadius: 0`), solid backgrounds (`#1e1e2e`), `2px solid` borders, hard offset shadows (`2px 2px 0px #0a0a14`, no blur). CSS variables defined in `index.css` `:root` (`--pixel-bg`, `--pixel-border`, `--pixel-accent`, etc.). Pixel font: FS Pixel Sans (`webview-ui/src/fonts/`), loaded via `@font-face` in `index.css`, applied globally.
+**UI styling**: Pixel art aesthetic — all overlays use sharp corners (`borderRadius: 0`), solid backgrounds (`#1e1e2e`), `2px solid` borders, hard offset shadows (`2px 2px 0px #0a0a14`, no blur). CSS variables defined in `index.css` `:root` (`--pixel-bg`, `--pixel-border`, `--pixel-accent`, etc.). Pixel font: FS Pixel Sans (`ui/src/fonts/`), loaded via `@font-face` in `index.css`, applied globally.
 
 **Characters**: FSM states — active (pathfind to seat, typing/reading animation by tool type), idle (wander randomly with BFS, return to seat for rest after `wanderLimit` moves). 4-directional sprites, left = flipped right. Tool animations: typing (Write/Edit/Bash/Task) vs reading (Read/Grep/Glob/WebFetch). Sitting offset: characters shift down 6px when in TYPE state so they visually sit in their chair. Z-sort uses `ch.y + TILE_SIZE/2 + 0.5` so characters render in front of same-row furniture (chairs) but behind furniture at lower rows (desks, bookshelves). Chair z-sorting: non-back chairs use `zY = (row+1)*TILE_SIZE` (capped to first row) so characters at any seat tile render in front; back-facing chairs use `zY = (row+1)*TILE_SIZE + 1` so the chair back renders in front of the character. Chair tiles are blocked for all characters except their own assigned seat (per-character pathfinding via `withOwnSeatUnblocked`). **Diverse palette assignment**: `pickDiversePalette()` counts palettes of current non-sub-agent characters; picks randomly from least-used palette(s). First 6 agents each get a unique skin; beyond 6, skins repeat with a random hue shift (45-315 degrees) via `adjustSprite()`. Character stores `palette` (0-5) + `hueShift` (degrees). Sprite cache keyed by `"palette:hueShift"`.
 
@@ -183,13 +183,13 @@ Toggle via "Layout" button. Tools: SELECT (default), Floor paint, Wall paint, Er
 ## Build & Dev
 
 ```sh
-npm run install:all    # Install all dependencies (root + webview-ui)
+npm run install:all    # Install all dependencies (root + ui)
 npm run dev            # bun --watch server + vite dev server (hot reload)
-npm run build          # vite build (frontend only, outputs to webview-ui/dist)
-npm start              # bun server/index.ts (production, serves webview-ui/dist)
+npm run build          # vite build (frontend only, outputs to ui/dist)
+npm start              # bun server/index.ts (production, serves ui/dist)
 ```
 
-Assets served as static files at `/assets/` from `webview-ui/dist/assets/`.
+Assets served as static files at `/assets/` from `ui/dist/assets/`.
 
 ## TypeScript Constraints
 
@@ -202,10 +202,10 @@ Assets served as static files at `/assets/` from `webview-ui/dist/assets/`.
 All magic numbers and strings are centralized — never add inline constants to source files:
 
 - **Server backend**: `server/constants.ts` — timing intervals, display truncation limits, PNG/asset parsing values, server port, persistence paths
-- **Webview**: `webview-ui/src/constants.ts` — grid/layout sizes, character animation speeds, matrix effect params, rendering offsets/colors, camera, zoom, editor defaults, game logic thresholds
-- **CSS styling**: `webview-ui/src/index.css` `:root` block — `--pixel-*` custom properties for UI colors, backgrounds, borders, z-indices used in React inline styles
+- **Webview**: `ui/src/constants.ts` — grid/layout sizes, character animation speeds, matrix effect params, rendering offsets/colors, camera, zoom, editor defaults, game logic thresholds
+- **CSS styling**: `ui/src/index.css` `:root` block — `--pixel-*` custom properties for UI colors, backgrounds, borders, z-indices used in React inline styles
 - **Canvas overlay colors** (rgba strings for seats, grids, ghosts, buttons) live in the webview constants file since they're used in canvas 2D context, not CSS
-- `webview-ui/src/office/types.ts` re-exports grid/layout constants (`TILE_SIZE`, `DEFAULT_COLS`, etc.) from `constants.ts` for backward compatibility — import from either location
+- `ui/src/office/types.ts` re-exports grid/layout constants (`TILE_SIZE`, `DEFAULT_COLS`, etc.) from `constants.ts` for backward compatibility — import from either location
 
 ## Key Patterns
 

@@ -45,7 +45,7 @@ interface DetectionOutput {
 }
 
 const args = process.argv.slice(2)
-const pngPath = args[0] || './webview-ui/public/assets/office_tileset_16x16.png'
+const pngPath = args[0] || './ui/public/assets/office_tileset_16x16.png'
 
 console.log(`\n📷 Reading tileset: ${pngPath}`)
 

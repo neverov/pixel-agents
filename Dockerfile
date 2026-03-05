@@ -3,12 +3,12 @@ WORKDIR /app
 
 COPY package.json ./
 COPY server/package.json server/bun.lock server/
-COPY webview-ui/package.json webview-ui/package-lock.json webview-ui/
+COPY ui/package.json ui/package-lock.json ui/
 
-RUN bun install && cd server && bun install && cd ../webview-ui && bun install
+RUN bun install && cd server && bun install && cd ../ui && bun install
 
 COPY . .
-RUN cd webview-ui && bun run build
+RUN cd ui && bun run build
 
 EXPOSE 3000
 

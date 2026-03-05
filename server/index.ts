@@ -35,19 +35,19 @@ function persistAgents(): void {
 const app = express();
 app.use(express.json({ limit: '10mb' }));
 
-// Serve webview-ui dist (built frontend)
-const webviewDistPath = path.join(import.meta.dirname, '..', 'webview-ui', 'dist');
+// Serve ui dist (built frontend)
+const webviewDistPath = path.join(import.meta.dirname, '..', 'ui', 'dist');
 if (fs.existsSync(webviewDistPath)) {
 	app.use(express.static(webviewDistPath));
 }
 
 // Serve assets (PNGs, catalog JSON, default layout)
-const assetsPath = path.join(import.meta.dirname, '..', 'webview-ui', 'public', 'assets');
+const assetsPath = path.join(import.meta.dirname, '..', 'ui', 'public', 'assets');
 if (fs.existsSync(assetsPath)) {
 	app.use('/assets', express.static(assetsPath));
 }
 // Also try dist/assets for production builds
-const distAssetsPath = path.join(import.meta.dirname, '..', 'webview-ui', 'dist', 'assets');
+const distAssetsPath = path.join(import.meta.dirname, '..', 'ui', 'dist', 'assets');
 if (fs.existsSync(distAssetsPath)) {
 	app.use('/assets', express.static(distAssetsPath));
 }
@@ -67,7 +67,7 @@ app.use((_req, res) => {
 	if (fs.existsSync(indexPath)) {
 		res.sendFile(indexPath);
 	} else {
-		res.status(404).send('Frontend not built. Run: cd webview-ui && npm run build');
+		res.status(404).send('Frontend not built. Run: cd ui && npm run build');
 	}
 });
 

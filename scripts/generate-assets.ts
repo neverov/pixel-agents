@@ -394,7 +394,7 @@ function stripToPng(sprites: SpriteData[]): Buffer {
 
 // ── Main ─────────────────────────────────────────────────────────
 
-const ASSETS_DIR = join(import.meta.dirname, '..', 'webview-ui', 'public', 'assets')
+const ASSETS_DIR = join(import.meta.dirname, '..', 'ui', 'public', 'assets')
 const FURNITURE_DIR = join(ASSETS_DIR, 'furniture')
 
 // 1. Generate floors.png

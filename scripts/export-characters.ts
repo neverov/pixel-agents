@@ -2,7 +2,7 @@
  * Export pre-colored character sprites to PNG files.
  *
  * Generates 6 PNG files (one per palette) in
- * webview-ui/public/assets/characters/. Each PNG is 112×96:
+ * ui/public/assets/characters/. Each PNG is 112×96:
  *   - 7 frames horizontally (16px each) = 112px wide
  *   - 3 direction rows vertically (32px each) = 96px tall
  *     Row 0 = down, Row 1 = up, Row 2 = right
@@ -18,7 +18,7 @@
 import * as fs from 'fs'
 import * as path from 'path'
 import { PNG } from 'pngjs'
-import { CHARACTER_TEMPLATES, CHARACTER_PALETTES } from '../webview-ui/src/office/sprites/spriteData.js'
+import { CHARACTER_TEMPLATES, CHARACTER_PALETTES } from '../ui/src/office/sprites/spriteData.js'
 
 const FRAME_W = 16
 const FRAME_H = 32
@@ -101,7 +101,7 @@ function buildCharacterPng(
   return PNG.sync.write(png)
 }
 
-const outDir = path.join(__dirname, '..', 'webview-ui', 'public', 'assets', 'characters')
+const outDir = path.join(__dirname, '..', 'ui', 'public', 'assets', 'characters')
 fs.mkdirSync(outDir, { recursive: true })
 
 for (let i = 0; i < CHARACTER_PALETTES.length; i++) {

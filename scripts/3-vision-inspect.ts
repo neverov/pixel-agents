@@ -52,7 +52,7 @@ interface AssetWithMetadata {
   suggestedCanPlaceOnWalls?: boolean
 }
 
-const pngPath = './webview-ui/public/assets/office_tileset_16x16.png'
+const pngPath = './ui/public/assets/office_tileset_16x16.png'
 const inputJsonPath = './scripts/.tileset-working/asset-editor-output.json'
 const outputJsonPath = './scripts/.tileset-working/tileset-metadata-draft.json'
 

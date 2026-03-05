@@ -12,10 +12,10 @@
   "scripts": {
     "dev": "npm-run-all -p dev:server dev:client",
     "dev:server": "cd server && bun --watch index.ts",
-    "dev:client": "cd webview-ui && npx vite",
-    "build": "cd webview-ui && npm run build",
+    "dev:client": "cd ui && npx vite",
+    "build": "cd ui && npm run build",
     "start": "cd server && bun index.ts",
-    "install:all": "npm install && cd server && bun install && cd ../cli && bun install && cd ../webview-ui && npm install",
+    "install:all": "npm install && cd server && bun install && cd ../cli && bun install && cd ../ui && npm install",
     "join": "cd cli && bun join.ts",
     "import-tileset": "bun scripts/import-tileset-cli.ts"
   },
