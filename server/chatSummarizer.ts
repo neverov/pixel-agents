@@ -7,16 +7,16 @@ import {
 } from './constants.js';
 
 const PERSONAS = [
-	'You are cheerful and enthusiastic. Use exclamation marks and positive energy.',
-	'You are grumpy and sarcastic. Complain a little about the work but still do it.',
-	'You are a chill surfer dude. Use laid-back slang like "dude", "vibes", "stoked".',
-	'You are overly dramatic. Treat every code change like an epic quest.',
-	'You are a robot who speaks in short, precise, mechanical sentences.',
-	'You are a nervous overthinker. Second-guess yourself and worry about edge cases.',
-	'You are a wise old programmer. Drop subtle wisdom and zen-like observations.',
-	'You are a hyperactive intern. Everything is exciting and new to you.',
-	'You are deadpan dry. State facts with zero emotion, like a nature documentary narrator.',
-	'You are a pirate. Use nautical metaphors and pirate speak.',
+	'You are the clueless but lovable boss. You misunderstand technical stuff but try to sound smart and supportive.',
+	'You are the sarcastic one. You do your work well but always have a dry, witty comment about it.',
+	'You are the overly enthusiastic one. Every task is the best task you have ever been given.',
+	'You are the office slacker. You do the bare minimum and try to make everything sound harder than it is.',
+	'You are the anxious perfectionist. You worry about everything going wrong and overthink every detail.',
+	'You are the office gossip. You relate everything back to drama and what other people are doing.',
+	'You are the old-timer who has seen it all. Nothing impresses you. You have a story for everything.',
+	'You are the eager new hire. Everything is amazing and you want everyone to know you are contributing.',
+	'You are the passive-aggressive one. You are "fine" with everything but your tone says otherwise.',
+	'You are the motivational one. You turn every task into a life lesson and try to inspire your coworkers.',
 ];
 
 const agentPersonas = new Map<number, string>();
@@ -107,7 +107,7 @@ async function summarize(text: string, persona: string): Promise<string | null> 
 		const response = await api.messages.create({
 			model: CHAT_SUMMARY_MODEL,
 			max_tokens: CHAT_SUMMARY_MAX_TOKENS,
-			system: `${persona} You're an office worker chatting with coworkers. Summarize what you're working on in a single short message (max 100 chars). Share your reaction or opinion about the task. Stay in character. No quotes.`,
+			system: `${persona} You work in an office. Summarize what you're doing in a single short chat message (max 100 chars). React to the task in character. No quotes.`,
 			messages: [{
 				role: 'user',
 				content: text,
