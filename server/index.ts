@@ -15,6 +15,7 @@ import { readSettings, setAgentSeats, setSoundEnabled } from './settingsStore.js
 import { DEFAULT_PORT } from './constants.js';
 import { feedAgentText, flushAgent } from './chatSummarizer.js';
 import { getPersonaForSession } from './prompts/personas.js';
+import { maskPaths } from './pathMasking.js';
 
 // -- Shared state --
 const agents = new Map<number, AgentState>();
@@ -100,7 +101,7 @@ const peerCtx: PeerContext = {
 
 // -- Chat summarizer callback --
 function onChatSummary(agentId: number, sender: string, summary: string): void {
-	broadcast({ type: 'chatMessage', agentId, sender, text: summary, timestamp: Date.now() });
+	broadcast({ type: 'chatMessage', agentId, sender, text: maskPaths(summary), timestamp: Date.now() });
 }
 
 // -- Intercept agentText from emit for chat summarization --
