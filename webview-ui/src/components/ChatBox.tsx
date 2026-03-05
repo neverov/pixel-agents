@@ -52,9 +52,30 @@ const messageStyle: React.CSSProperties = {
   color: 'var(--pixel-text)',
 }
 
-const senderStyle: React.CSSProperties = {
+const agentNameStyle: React.CSSProperties = {
   color: 'var(--pixel-accent)',
   fontWeight: 'bold',
+}
+
+const peerNameStyle: React.CSSProperties = {
+  color: 'var(--pixel-text-dim)',
+  fontWeight: 'normal',
+}
+
+function formatSender(sender: string): React.ReactNode {
+  const colonIdx = sender.indexOf(': ')
+  if (colonIdx >= 0) {
+    const peer = sender.slice(0, colonIdx)
+    const agent = sender.slice(colonIdx + 2)
+    return (
+      <>
+        <span style={agentNameStyle}>{agent}</span>
+        {' '}
+        <span style={peerNameStyle}>[{peer}]</span>
+      </>
+    )
+  }
+  return <span style={agentNameStyle}>{sender}</span>
 }
 
 export function ChatBox({ messages, isOpen }: ChatBoxProps) {
@@ -79,7 +100,7 @@ export function ChatBox({ messages, isOpen }: ChatBoxProps) {
         ) : (
           messages.map((msg, i) => (
             <div key={i} style={messageStyle}>
-              <span style={senderStyle}>{msg.sender}:</span>{' '}
+              {formatSender(msg.sender)}:{' '}
               {msg.text}
             </div>
           ))
