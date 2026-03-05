@@ -11,6 +11,7 @@ export function persistAgents(agents: Map<number, AgentState>): void {
 			label: agent.label,
 			customLabel: agent.customLabel,
 			sessionId: agent.sessionId || sessionIdFromFile(agent.jsonlFile),
+			persona: agent.persona,
 		});
 	}
 	replaceAllAgents(persisted).catch(err => console.error('[Persist] Failed:', err));

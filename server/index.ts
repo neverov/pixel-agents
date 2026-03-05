@@ -14,7 +14,7 @@ import type { LayoutWatcher } from './layoutPersistence.js';
 import { readSettings, setAgentSeats, setSoundEnabled } from './settingsStore.js';
 import { DEFAULT_PORT } from './constants.js';
 import { feedAgentText, flushAgent } from './chatSummarizer.js';
-import { getPersonaForSession } from './prompts/personas.js';
+import { getPersona } from './prompts/personas.js';
 import { maskPaths } from './pathMasking.js';
 import { initDb, closeDb } from './db.js';
 import { appendChatMessage, getChatMessages } from './db/chatRepo.js';
@@ -117,12 +117,12 @@ function instrumentedBroadcast(msg: unknown): void {
 		const text = m.text as string;
 		const agent = agents.get(agentId);
 		const name = agent?.label || `Agent ${agentId}`;
-		feedAgentText(agentId, text, name, agent?.sessionId ?? '', onChatSummary);
+		feedAgentText(agentId, text, name, agent?.persona, onChatSummary);
 	} else if (m.type === 'agentStatus' && m.status === 'waiting') {
 		const agentId = m.id as number;
 		const agent = agents.get(agentId);
 		const name = agent?.label || `Agent ${agentId}`;
-		flushAgent(agentId, name, agent?.sessionId ?? '', onChatSummary);
+		flushAgent(agentId, name, agent?.persona, onChatSummary);
 	}
 }
 peerCtx.emit = instrumentedBroadcast;
@@ -176,7 +176,7 @@ setConnectHandler(async (ws) => {
 	for (const [id, agent] of agents) {
 		const displayName = agent.customLabel || agent.label;
 		if (displayName) folderNames[id] = displayName;
-		personaTaglines[id] = getPersonaForSession(agent.sessionId ?? '').tagline;
+		personaTaglines[id] = getPersona(agent.persona).tagline;
 	}
 	sendTo(ws, {
 		type: 'existingAgents',

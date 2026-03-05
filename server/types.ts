@@ -31,6 +31,8 @@ export interface AgentState {
 	peerLocalId?: number;
 	/** Display name of the remote peer */
 	peerName?: string;
+	/** Assigned persona name (persisted in DB) */
+	persona?: string;
 }
 
 /** Extract session UUID from a JSONL file path */

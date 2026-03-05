@@ -107,15 +107,15 @@ export const PERSONAS: readonly Persona[] = [
 	},
 ];
 
-function hashString(str: string): number {
-	let hash = 0;
-	for (let i = 0; i < str.length; i++) {
-		hash = ((hash << 5) - hash + str.charCodeAt(i)) | 0;
-	}
-	return Math.abs(hash);
-}
+const personasByName = new Map<string, Persona>(
+	PERSONAS.map(p => [p.name, p]),
+);
 
-export function getPersonaForSession(sessionId: string): Persona {
-	const index = hashString(sessionId) % PERSONAS.length;
-	return PERSONAS[index];
+/** Look up a persona by name, falling back to a random one if not found */
+export function getPersona(name: string | undefined): Persona {
+	if (name) {
+		const found = personasByName.get(name);
+		if (found) return found;
+	}
+	return PERSONAS[Math.floor(Math.random() * PERSONAS.length)];
 }

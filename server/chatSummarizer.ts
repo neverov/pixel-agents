@@ -5,7 +5,7 @@ import {
 	CHAT_SUMMARY_MODEL,
 	CHAT_SUMMARY_MAX_TOKENS,
 } from './constants.js';
-import { getPersonaForSession } from './prompts/personas.js';
+import { getPersona } from './prompts/personas.js';
 import { buildChatSummarySystem } from './prompts/chatSummary.js';
 
 let client: Anthropic | null = null;
@@ -20,7 +20,7 @@ function getClient(): Anthropic | null {
 interface PendingText {
 	chunks: string[];
 	timer: ReturnType<typeof setTimeout> | null;
-	sessionId: string;
+	personaName: string | undefined;
 }
 
 const pending = new Map<number, PendingText>();
@@ -29,14 +29,14 @@ export function feedAgentText(
 	agentId: number,
 	text: string,
 	agentName: string,
-	sessionId: string,
+	personaName: string | undefined,
 	onSummary: (agentId: number, sender: string, summary: string) => void,
 ): void {
 	if (!getClient()) return;
 
 	let entry = pending.get(agentId);
 	if (!entry) {
-		entry = { chunks: [], timer: null, sessionId };
+		entry = { chunks: [], timer: null, personaName };
 		pending.set(agentId, entry);
 	}
 
@@ -51,12 +51,12 @@ export function feedAgentText(
 export function flushAgent(
 	agentId: number,
 	agentName: string,
-	sessionId: string,
+	personaName: string | undefined,
 	onSummary: (agentId: number, sender: string, summary: string) => void,
 ): void {
 	const entry = pending.get(agentId);
-	if (entry && !entry.sessionId) {
-		entry.sessionId = sessionId;
+	if (entry && !entry.personaName) {
+		entry.personaName = personaName;
 	}
 	flush(agentId, agentName, onSummary);
 }
@@ -76,7 +76,7 @@ function flush(
 		entry.timer = null;
 	}
 
-	const persona = getPersonaForSession(entry.sessionId);
+	const persona = getPersona(entry.personaName);
 	void summarize(combined, persona.systemPrompt).then((summary) => {
 		if (summary) {
 			onSummary(agentId, agentName, summary);
