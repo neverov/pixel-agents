@@ -162,7 +162,8 @@ setConnectHandler((ws) => {
 	const agentSeats = settings.agentSeats || {};
 	const folderNames: Record<number, string> = {};
 	for (const [id, agent] of agents) {
-		if (agent.customLabel || agent.label) folderNames[id] = agent.customLabel || agent.label;
+		const displayName = agent.customLabel || agent.label;
+		if (displayName) folderNames[id] = displayName;
 	}
 	sendTo(ws, {
 		type: 'existingAgents',
