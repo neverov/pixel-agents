@@ -2,6 +2,7 @@ import { WebSocket } from 'ws';
 import type { AgentState } from './types.js';
 import { resolveAgentId } from './db/agentsRepo.js';
 import { getPersona } from './prompts/personas.js';
+import { sendTo } from './wsManager.js';
 
 const ADJECTIVES = [
 	'brave', 'cosmic', 'turbo', 'swift', 'neon', 'pixel', 'cyber', 'mega',
@@ -58,12 +59,6 @@ function findPeer(ws: WebSocket): PeerState | null {
 
 function getGlobalId(peer: PeerState, localId: number): number | null {
 	return peer.agentIdMap.get(localId) ?? null;
-}
-
-function sendTo(ws: WebSocket, msg: unknown): void {
-	if (ws.readyState === WebSocket.OPEN) {
-		ws.send(JSON.stringify(msg));
-	}
 }
 
 /**

@@ -104,7 +104,7 @@ const peerCtx: PeerContext = {
 // -- Chat summarizer callback --
 function onChatSummary(agentId: number, sender: string, summary: string): void {
 	broadcast({ type: 'chatMessage', agentId, sender, text: maskPaths(summary), timestamp: Date.now() });
-	void appendChatMessage({ agentId, sender, text: summary });
+	void appendChatMessage({ agentId, sender, text: summary }).catch(err => console.error('[Chat] Persist failed:', err));
 }
 
 // -- Intercept agentText from emit for chat summarization --

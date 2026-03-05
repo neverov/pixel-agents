@@ -16,6 +16,13 @@ export async function query(sql: string, params?: unknown[]): Promise<pg.QueryRe
 	return p.query(sql, params);
 }
 
+/** Get a dedicated client for transactions (caller must release). */
+export async function getClient(): Promise<pg.PoolClient | null> {
+	const p = getPool();
+	if (!p) return null;
+	return p.connect();
+}
+
 export async function initDb(): Promise<void> {
 	const p = getPool();
 	if (!p) {

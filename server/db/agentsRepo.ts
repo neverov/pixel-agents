@@ -1,4 +1,4 @@
-import { query } from '../db.js';
+import { query, getClient } from '../db.js';
 import type { PersistedAgent } from '../types.js';
 
 export async function getPersistedAgents(): Promise<PersistedAgent[]> {
@@ -67,16 +67,27 @@ export async function deleteAgent(id: number): Promise<void> {
 }
 
 export async function replaceAllAgents(agents: PersistedAgent[]): Promise<void> {
-	const result = await query('BEGIN', []);
-	if (!result) return;
+	const client = await getClient();
+	if (!client) return;
 	try {
-		await query('DELETE FROM agents', []);
+		await client.query('BEGIN');
+		await client.query('DELETE FROM agents');
 		for (const agent of agents) {
-			await upsertAgent(agent);
+			await client.query(
+				`INSERT INTO agents (id, jsonl_file, project_dir, label, custom_label, session_id, persona)
+				 VALUES ($1, $2, $3, $4, $5, $6, $7)
+				 ON CONFLICT (id) DO UPDATE SET
+					jsonl_file = EXCLUDED.jsonl_file, project_dir = EXCLUDED.project_dir,
+					label = EXCLUDED.label, custom_label = EXCLUDED.custom_label,
+					session_id = EXCLUDED.session_id, persona = EXCLUDED.persona`,
+				[agent.id, agent.jsonlFile, agent.projectDir, agent.label || null, agent.customLabel || null, agent.sessionId || null, agent.persona || null],
+			);
 		}
-		await query('COMMIT', []);
+		await client.query('COMMIT');
 	} catch (err) {
-		await query('ROLLBACK', []);
+		await client.query('ROLLBACK');
 		throw err;
+	} finally {
+		client.release();
 	}
 }

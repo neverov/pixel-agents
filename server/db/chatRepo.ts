@@ -1,5 +1,5 @@
 import { query } from '../db.js';
-import { CHAT_PERSIST_MAX } from '../constants.js';
+import { CHAT_PERSIST_MAX, CHAT_CLEANUP_EVERY } from '../constants.js';
 
 export interface ChatMessageRow {
 	agentId: number;
@@ -9,7 +9,6 @@ export interface ChatMessageRow {
 }
 
 let insertCount = 0;
-const CLEANUP_EVERY = 50;
 
 export async function appendChatMessage(msg: { agentId: number; sender: string; text: string }): Promise<void> {
 	await query(
@@ -18,7 +17,7 @@ export async function appendChatMessage(msg: { agentId: number; sender: string; 
 	);
 
 	// Periodic trim instead of per-insert
-	if (++insertCount % CLEANUP_EVERY === 0) {
+	if (++insertCount % CHAT_CLEANUP_EVERY === 0) {
 		await query(
 			`DELETE FROM chat_messages WHERE id NOT IN (
 				SELECT id FROM chat_messages ORDER BY created_at DESC LIMIT $1
@@ -30,7 +29,9 @@ export async function appendChatMessage(msg: { agentId: number; sender: string; 
 
 export async function getChatMessages(limit = 200): Promise<ChatMessageRow[]> {
 	const result = await query(
-		'SELECT agent_id, sender, text, created_at FROM chat_messages ORDER BY created_at ASC LIMIT $1',
+		`SELECT agent_id, sender, text, created_at FROM (
+			SELECT * FROM chat_messages ORDER BY created_at DESC LIMIT $1
+		) sub ORDER BY created_at ASC`,
 		[limit],
 	);
 	if (!result) return [];

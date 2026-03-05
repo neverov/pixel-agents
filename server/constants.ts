@@ -27,6 +27,7 @@ export const CHAT_MAX_TEXT_LENGTH = 2000;
 export const CHAT_SUMMARY_MODEL = 'claude-haiku-4-5-20251001';
 export const CHAT_SUMMARY_MAX_TOKENS = 60;
 export const CHAT_PERSIST_MAX = 500;
+export const CHAT_CLEANUP_EVERY = 50;
 
 // -- Server --
 export const DEFAULT_PORT = 3000;
