@@ -57,14 +57,28 @@ export function processTranscriptLine(
 		if (record.type === 'assistant' && Array.isArray(record.message?.content)) {
 			const usage = record.message?.usage;
 			if (usage) {
-				emit({
-					type: 'agentTokens',
-					id: agentId,
-					input: (usage.input_tokens || 0) + (usage.cache_creation_input_tokens || 0) + (usage.cache_read_input_tokens || 0),
-					output: usage.output_tokens || 0,
-					cacheRead: usage.cache_read_input_tokens || 0,
-					cacheCreation: usage.cache_creation_input_tokens || 0,
-				});
+				const totalInput = (usage.input_tokens || 0) + (usage.cache_creation_input_tokens || 0) + (usage.cache_read_input_tokens || 0);
+				const totalOutput = usage.output_tokens || 0;
+				const totalCacheRead = usage.cache_read_input_tokens || 0;
+				const totalCacheCreation = usage.cache_creation_input_tokens || 0;
+
+				const prev = agent.lastUsage || { input: 0, output: 0, cacheRead: 0, cacheCreation: 0 };
+				const deltaInput = totalInput - prev.input;
+				const deltaOutput = totalOutput - prev.output;
+				const deltaCacheRead = totalCacheRead - prev.cacheRead;
+				const deltaCacheCreation = totalCacheCreation - prev.cacheCreation;
+				agent.lastUsage = { input: totalInput, output: totalOutput, cacheRead: totalCacheRead, cacheCreation: totalCacheCreation };
+
+				if (deltaInput > 0 || deltaOutput > 0) {
+					emit({
+						type: 'agentTokens',
+						id: agentId,
+						input: deltaInput,
+						output: deltaOutput,
+						cacheRead: deltaCacheRead,
+						cacheCreation: deltaCacheCreation,
+					});
+				}
 			}
 
 			const blocks = record.message.content as Array<{
