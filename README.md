@@ -12,9 +12,12 @@ Multiple people can join the same office from different machines, making it a sh
 - **Multiplayer** — anyone can join your office with `bun cli/join.ts ws://host:3000/ws --name Name`
 - **Office layout editor** — design your space with floors, walls, and furniture using the built-in editor
 - **Speech bubbles** — visual indicators when an agent is waiting for input or needs permission
+- **Agent chat** — agents post short messages about what they're working on, each with a unique personality (powered by Haiku summarization)
+- **Token usage dashboard** — track input/output token consumption per agent in real time
 - **Sound notifications** — optional chime when an agent finishes its turn
 - **Sub-agent visualization** — Task tool sub-agents spawn as separate characters linked to their parent
 - **Persistent layouts** — your office design is saved across sessions
+- **Custom agent names** — agents get fun random names (e.g. "Golden Penguin"), and you can rename them
 - **Diverse characters** — 6 diverse character skins with automatic palette assignment. Based on [JIK-A-4, Metro City](https://jik-a-4.itch.io/metrocity-free-topdown-character-pack).
 
 <p align="center">
@@ -64,7 +67,7 @@ Share the server URL and others can join from their machines:
 bun cli/join.ts ws://your-host:3000/ws --name Alice
 ```
 
-Their Claude sessions appear in the same office with labels like "Alice: project-name". Use [ngrok](https://ngrok.com/) or similar for remote access:
+Their Claude sessions appear in the same office with labels showing the peer name and a randomly assigned agent name. Use [ngrok](https://ngrok.com/) or similar for remote access:
 
 ```bash
 ngrok http 3000
@@ -109,28 +112,39 @@ The join CLI watches Claude Code's JSONL transcript files (`~/.claude/projects/`
 
 No modifications to Claude Code are needed — it's purely observational.
 
+### Agent Chat
+
+Set the `ANTHROPIC_API_KEY` environment variable to enable agent chat. When agents produce text output, the server summarizes it into short casual messages using Claude Haiku. Each agent gets a random personality — some are enthusiastic, some are grumpy, some are dramatic.
+
+Without the API key, the chat panel shows but stays empty. Everything else works normally.
+
 ## Architecture
 
 ```
 server/           Node.js backend (Express, WS)
   index.ts        Entry point — HTTP server, WS relay, layout/settings
   peerManager.ts  Peer protocol — maps remote agent events to broadcasts
-  join.ts         CLI entry point for connecting local sessions
+  chatSummarizer.ts  Haiku-powered chat message generation
   wsManager.ts    WebSocket server
   routes.ts       REST API (layout, settings)
   ...             File watching, transcript parsing, timers
+
+cli/              Peer CLI (separate package)
+  join.ts         Connects local Claude sessions to a remote server
 
 webview-ui/       React + Vite frontend
   src/
     serverApi.ts  WS + REST client
     assetLoader.ts  Browser-side PNG -> sprite loading
     office/       Game engine (canvas, characters, editor)
+    components/   UI panels (ChatBox, TokenDashboard, etc.)
 ```
 
 ## Tech Stack
 
-- **Server**: TypeScript, Express, ws, node-pty, Bun
+- **Server**: TypeScript, Express, ws, Bun
 - **Frontend**: React 19, TypeScript, Vite, Canvas 2D
+- **Chat**: Anthropic SDK (Claude Haiku) for agent message summarization
 - **Communication**: WebSocket (real-time events) + REST (layout/settings)
 
 ## Known Limitations
