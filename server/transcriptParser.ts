@@ -55,6 +55,18 @@ export function processTranscriptLine(
 		const record = JSON.parse(line);
 
 		if (record.type === 'assistant' && Array.isArray(record.message?.content)) {
+			const usage = record.message?.usage;
+			if (usage) {
+				emit({
+					type: 'agentTokens',
+					id: agentId,
+					input: (usage.input_tokens || 0) + (usage.cache_creation_input_tokens || 0) + (usage.cache_read_input_tokens || 0),
+					output: usage.output_tokens || 0,
+					cacheRead: usage.cache_read_input_tokens || 0,
+					cacheCreation: usage.cache_creation_input_tokens || 0,
+				});
+			}
+
 			const blocks = record.message.content as Array<{
 				type: string; id?: string; name?: string; input?: Record<string, unknown>;
 			}>;

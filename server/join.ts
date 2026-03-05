@@ -105,6 +105,9 @@ function createPeerEmit(localId: number): (msg: unknown) => void {
 			case 'subagentToolPermission':
 				send({ type: 'peerSubagentToolPermission', localId, parentToolId: m.parentToolId });
 				break;
+			case 'agentTokens':
+				send({ type: 'peerAgentTokens', localId, input: m.input, output: m.output, cacheRead: m.cacheRead, cacheCreation: m.cacheCreation });
+				break;
 		}
 	};
 }

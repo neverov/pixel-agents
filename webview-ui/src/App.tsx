@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef, type MutableRefObject } from 'react'
 import { OfficeState } from './office/engine/officeState.js'
 import { OfficeCanvas } from './office/components/OfficeCanvas.js'
 import { ToolOverlay } from './office/components/ToolOverlay.js'
@@ -15,6 +15,8 @@ import { ZoomControls } from './components/ZoomControls.js'
 import { BottomToolbar } from './components/BottomToolbar.js'
 import { DebugView } from './components/DebugView.js'
 import { AgentLabels } from './components/AgentLabels.js'
+import { TokenDashboard } from './components/TokenDashboard.js'
+import { TokenPopups } from './components/TokenPopups.js'
 
 // Game state lives outside React — updated imperatively by message handlers
 const officeStateRef = { current: null as OfficeState | null }
@@ -122,11 +124,18 @@ function App() {
 
   const isEditDirty = useCallback(() => editor.isEditMode && editor.isDirty, [editor.isEditMode, editor.isDirty])
 
-  const { agents, selectedAgent, agentTools, agentStatuses, subagentTools, subagentCharacters, layoutReady } = useServerMessages(getOfficeState, editor.setLastSavedLayout, isEditDirty)
+  const tokenPopupRef = useRef<((agentId: number, input: number, output: number) => void) | null>(null)
+  const onTokens = useCallback((agentId: number, input: number, output: number) => {
+    tokenPopupRef.current?.(agentId, input, output)
+  }, [])
+
+  const { agents, selectedAgent, agentTools, agentStatuses, subagentTools, subagentCharacters, agentTokens, layoutReady } = useServerMessages(getOfficeState, editor.setLastSavedLayout, isEditDirty, onTokens)
 
   const [isDebugMode, setIsDebugMode] = useState(false)
+  const [isTokenDashboardOpen, setIsTokenDashboardOpen] = useState(true)
 
   const handleToggleDebugMode = useCallback(() => setIsDebugMode((prev) => !prev), [])
+  const handleToggleTokenDashboard = useCallback(() => setIsTokenDashboardOpen((prev) => !prev), [])
 
   const handleSelectAgent = useCallback((id: number) => {
     serverApi.postMessage({ type: 'focusAgent', id })
@@ -225,7 +234,18 @@ function App() {
         onToggleEditMode={editor.handleToggleEditMode}
         isDebugMode={isDebugMode}
         onToggleDebugMode={handleToggleDebugMode}
+        isTokenDashboardOpen={isTokenDashboardOpen}
+        onToggleTokenDashboard={handleToggleTokenDashboard}
       />
+
+      {isTokenDashboardOpen && (
+        <TokenDashboard
+          agentTokens={agentTokens}
+          agents={agents}
+          officeState={officeState}
+          onClose={handleToggleTokenDashboard}
+        />
+      )}
 
       {editor.isEditMode && editor.isDirty && (
         <EditActionBar editor={editor} editorState={editorState} />
@@ -288,6 +308,14 @@ function App() {
         containerRef={containerRef}
         zoom={editor.zoom}
         panRef={editor.panRef}
+      />
+
+      <TokenPopups
+        officeState={officeState}
+        containerRef={containerRef}
+        zoom={editor.zoom}
+        panRef={editor.panRef}
+        onPopup={tokenPopupRef as MutableRefObject<((agentId: number, input: number, output: number) => void) | null>}
       />
 
       <AgentLabels

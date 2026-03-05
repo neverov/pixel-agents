@@ -14,6 +14,13 @@ export interface SubagentCharacter {
   label: string
 }
 
+export interface TokenUsage {
+  input: number
+  output: number
+  cacheRead: number
+  cacheCreation: number
+}
+
 export interface ServerMessageState {
   agents: number[]
   selectedAgent: number | null
@@ -21,6 +28,7 @@ export interface ServerMessageState {
   agentStatuses: Record<number, string>
   subagentTools: Record<number, Record<string, ToolActivity[]>>
   subagentCharacters: SubagentCharacter[]
+  agentTokens: Record<number, TokenUsage>
   layoutReady: boolean
 }
 
@@ -37,6 +45,7 @@ export function useServerMessages(
   getOfficeState: () => OfficeState,
   onLayoutLoaded?: (layout: OfficeLayout) => void,
   isEditDirty?: () => boolean,
+  onTokens?: (agentId: number, input: number, output: number) => void,
 ): ServerMessageState {
   const [agents, setAgents] = useState<number[]>([])
   const [selectedAgent, setSelectedAgent] = useState<number | null>(null)
@@ -44,6 +53,7 @@ export function useServerMessages(
   const [agentStatuses, setAgentStatuses] = useState<Record<number, string>>({})
   const [subagentTools, setSubagentTools] = useState<Record<number, Record<string, ToolActivity[]>>>({})
   const [subagentCharacters, setSubagentCharacters] = useState<SubagentCharacter[]>([])
+  const [agentTokens, setAgentTokens] = useState<Record<number, TokenUsage>>({})
   const [layoutReady, setLayoutReady] = useState(false)
 
   const layoutReadyRef = useRef(false)
@@ -100,6 +110,12 @@ export function useServerMessages(
           return next
         })
         setSubagentTools((prev) => {
+          if (!(id in prev)) return prev
+          const next = { ...prev }
+          delete next[id]
+          return next
+        })
+        setAgentTokens((prev) => {
           if (!(id in prev)) return prev
           const next = { ...prev }
           delete next[id]
@@ -280,6 +296,21 @@ export function useServerMessages(
         })
         os.removeSubagent(id, parentToolId)
         setSubagentCharacters((prev) => prev.filter((s) => !(s.parentAgentId === id && s.parentToolId === parentToolId)))
+      } else if (msg.type === 'agentTokens') {
+        const id = msg.id as number
+        onTokens?.(id, msg.input as number, msg.output as number)
+        setAgentTokens((prev) => {
+          const cur = prev[id] || { input: 0, output: 0, cacheRead: 0, cacheCreation: 0 }
+          return {
+            ...prev,
+            [id]: {
+              input: cur.input + (msg.input as number),
+              output: cur.output + (msg.output as number),
+              cacheRead: cur.cacheRead + (msg.cacheRead as number),
+              cacheCreation: cur.cacheCreation + (msg.cacheCreation as number),
+            },
+          }
+        })
       } else if (msg.type === 'settingsLoaded') {
         const soundOn = msg.soundEnabled as boolean
         setSoundEnabled(soundOn)
@@ -298,5 +329,5 @@ export function useServerMessages(
     return () => unsubscribe?.()
   }, [getOfficeState])
 
-  return { agents, selectedAgent, agentTools, agentStatuses, subagentTools, subagentCharacters, layoutReady }
+  return { agents, selectedAgent, agentTools, agentStatuses, subagentTools, subagentCharacters, agentTokens, layoutReady }
 }

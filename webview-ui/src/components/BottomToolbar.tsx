@@ -6,6 +6,8 @@ interface BottomToolbarProps {
   onToggleEditMode: () => void
   isDebugMode: boolean
   onToggleDebugMode: () => void
+  isTokenDashboardOpen: boolean
+  onToggleTokenDashboard: () => void
 }
 
 const panelStyle: React.CSSProperties = {
@@ -45,12 +47,30 @@ export function BottomToolbar({
   onToggleEditMode,
   isDebugMode,
   onToggleDebugMode,
+  isTokenDashboardOpen,
+  onToggleTokenDashboard,
 }: BottomToolbarProps) {
   const [hovered, setHovered] = useState<string | null>(null)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
 
   return (
     <div style={panelStyle}>
+      <button
+        onClick={onToggleTokenDashboard}
+        onMouseEnter={() => setHovered('tokens')}
+        onMouseLeave={() => setHovered(null)}
+        style={
+          isTokenDashboardOpen
+            ? { ...btnActive }
+            : {
+                ...btnBase,
+                background: hovered === 'tokens' ? 'var(--pixel-btn-hover-bg)' : btnBase.background,
+              }
+        }
+        title="Token usage dashboard"
+      >
+        Tokens
+      </button>
       <button
         onClick={onToggleEditMode}
         onMouseEnter={() => setHovered('edit')}
