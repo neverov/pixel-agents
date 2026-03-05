@@ -147,10 +147,6 @@ function App() {
     editor.handleToggleEditMode,
   )
 
-  const handleCloseAgent = useCallback((id: number) => {
-    serverApi.postMessage({ type: 'closeAgent', id })
-  }, [])
-
   const handleClick = useCallback((agentId: number) => {
     // If clicked agent is a sub-agent, focus the parent's terminal instead
     const os = getOfficeState()
@@ -226,7 +222,6 @@ function App() {
 
       <BottomToolbar
         isEditMode={editor.isEditMode}
-        onOpenClaude={editor.handleOpenClaude}
         onToggleEditMode={editor.handleToggleEditMode}
         isDebugMode={isDebugMode}
         onToggleDebugMode={handleToggleDebugMode}
@@ -293,7 +288,6 @@ function App() {
         containerRef={containerRef}
         zoom={editor.zoom}
         panRef={editor.panRef}
-        onCloseAgent={handleCloseAgent}
       />
 
       <AgentLabels

@@ -1,5 +1,4 @@
 import type { ToolActivity } from '../office/types.js'
-import { serverApi } from '../serverApi.js'
 
 interface DebugViewProps {
   agents: number[]
@@ -87,20 +86,6 @@ export function DebugView({
             }}
           >
             Agent #{id}
-          </button>
-          <button
-            onClick={() => serverApi.postMessage({ type: 'closeAgent', id })}
-            style={{
-              borderRadius: 0,
-              padding: '6px 8px',
-              fontSize: '26px',
-              opacity: 0.7,
-              background: isSelected ? 'rgba(90, 140, 255, 0.25)' : undefined,
-              color: isSelected ? '#fff' : undefined,
-            }}
-            title="Close agent"
-          >
-            ✕
           </button>
         </span>
         {(tools.length > 0 || status === 'waiting') && (

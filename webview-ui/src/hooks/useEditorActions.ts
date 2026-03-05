@@ -19,7 +19,6 @@ export interface EditorActions {
   panRef: React.MutableRefObject<{ x: number; y: number }>
   saveTimerRef: React.MutableRefObject<ReturnType<typeof setTimeout> | null>
   setLastSavedLayout: (layout: OfficeLayout) => void
-  handleOpenClaude: () => void
   handleToggleEditMode: () => void
   handleToolChange: (tool: EditToolType) => void
   handleTileTypeChange: (type: TileTypeVal) => void
@@ -77,10 +76,6 @@ export function useEditorActions(
     saveLayout(newLayout)
     setEditorTick((n) => n + 1)
   }, [getOfficeState, editorState, saveLayout])
-
-  const handleOpenClaude = useCallback(() => {
-    serverApi.postMessage({ type: 'openClaude' })
-  }, [])
 
   const handleToggleEditMode = useCallback(() => {
     setIsEditMode((prev) => {
@@ -503,7 +498,6 @@ export function useEditorActions(
     panRef,
     saveTimerRef,
     setLastSavedLayout,
-    handleOpenClaude,
     handleToggleEditMode,
     handleToolChange,
     handleTileTypeChange,

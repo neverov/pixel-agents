@@ -21,8 +21,6 @@ let hasHadHandler = false
 
 // Messages that route to REST endpoints instead of WebSocket
 const REST_ROUTES: Record<string, { method: string; path: (msg: Record<string, unknown>) => string }> = {
-  openClaude: { method: 'POST', path: () => '/api/agents' },
-  closeAgent: { method: 'DELETE', path: (msg) => `/api/agents/${msg.id}` },
   saveLayout: { method: 'PUT', path: () => '/api/layout' },
   setSoundEnabled: { method: 'PUT', path: () => '/api/settings' },
   saveAgentSeats: { method: 'PUT', path: () => '/api/settings' },

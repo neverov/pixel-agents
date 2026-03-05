@@ -3,36 +3,23 @@ import * as path from 'path';
 import { createServer } from 'http';
 import express from 'express';
 import type { AgentState } from './types.js';
-import { initWebSocket, broadcast, sendTo, setMessageHandler, setConnectHandler, dispose as disposeWs } from './wsManager.js';
+import { initWebSocket, broadcast, sendTo, setMessageHandler, setConnectHandler, setDisconnectHandler, dispose as disposeWs } from './wsManager.js';
+import { handlePeerMessage, handlePeerDisconnect } from './peerManager.js';
+import type { PeerContext } from './peerManager.js';
 import { createRouter } from './routes.js';
 import type { RouteContext } from './routes.js';
-import {
-	persistAgents as doPersistAgents,
-	restoreAgents,
-	sendExistingAgents,
-} from './agentManager.js';
+import { persistAgents as doPersistAgents } from './agentManager.js';
 import { loadLayout, watchLayoutFile, writeLayoutToFile, readLayoutFromFile } from './layoutPersistence.js';
 import type { LayoutWatcher } from './layoutPersistence.js';
-import { readSettings, writeSettings, setAgentSeats, setSoundEnabled } from './settingsStore.js';
-import { startSessionScanner } from './sessionScanner.js';
+import { readSettings, setAgentSeats, setSoundEnabled } from './settingsStore.js';
 import { DEFAULT_PORT } from './constants.js';
 
 // -- Shared state --
 const agents = new Map<number, AgentState>();
 const nextAgentIdRef = { current: 1 };
-const activeAgentIdRef = { current: null as number | null };
-const knownJsonlFiles = new Set<string>();
-const fileWatchers = new Map<number, fs.FSWatcher>();
-const pollingTimers = new Map<number, ReturnType<typeof setInterval>>();
-const waitingTimers = new Map<number, ReturnType<typeof setTimeout>>();
-const permissionTimers = new Map<number, ReturnType<typeof setTimeout>>();
-const jsonlPollTimers = new Map<number, ReturnType<typeof setInterval>>();
-const projectScanTimerRef = { current: null as ReturnType<typeof setInterval> | null };
 
 let layoutWatcher: LayoutWatcher | null = null;
-let sessionScanTimer: ReturnType<typeof setInterval> | null = null;
 
-const cwd = process.argv[2] || process.cwd();
 const port = parseInt(process.env.PORT || String(DEFAULT_PORT), 10);
 
 function persistAgents(): void {
@@ -62,19 +49,8 @@ if (fs.existsSync(distAssetsPath)) {
 
 // Route context
 const routeCtx: RouteContext = {
-	nextAgentIdRef,
 	agents,
-	activeAgentIdRef,
-	knownJsonlFiles,
-	fileWatchers,
-	pollingTimers,
-	waitingTimers,
-	permissionTimers,
-	jsonlPollTimers,
-	projectScanTimerRef,
 	emit: broadcast,
-	persistAgents,
-	cwd,
 	layoutWatcher,
 };
 
@@ -112,8 +88,19 @@ layoutWatcher = watchLayoutFile((layout) => {
 });
 routeCtx.layoutWatcher = layoutWatcher;
 
-// -- WS message handler (replaces PixelAgentsViewProvider.onDidReceiveMessage) --
-setMessageHandler((msg) => {
+// -- Peer context --
+const peerCtx: PeerContext = {
+	nextAgentIdRef,
+	agents,
+	emit: broadcast,
+	persistAgents,
+};
+
+// -- WS message handler --
+setMessageHandler((msg, ws) => {
+	// Try peer protocol first
+	if (handlePeerMessage(ws, msg, peerCtx)) return;
+
 	if (msg.type === 'saveAgentSeats') {
 		setAgentSeats(msg.seats as Record<string, { palette?: number; hueShift?: number; seatId?: string | null }>);
 	} else if (msg.type === 'saveLayout') {
@@ -126,12 +113,17 @@ setMessageHandler((msg) => {
 	}
 });
 
+// -- Peer disconnect handler --
+setDisconnectHandler((ws) => {
+	handlePeerDisconnect(ws, peerCtx);
+});
+
 // -- Send initial state to new WS clients --
 setConnectHandler((ws) => {
 	const settings = readSettings();
 	sendTo(ws, { type: 'settingsLoaded', soundEnabled: settings.soundEnabled });
 
-	// Send existing agents
+	// Send existing agents (all remote, from peers)
 	const agentIds = [...agents.keys()].sort((a, b) => a - b);
 	const agentSeats = settings.agentSeats || {};
 	const folderNames: Record<number, string> = {};
@@ -160,37 +152,16 @@ setConnectHandler((ws) => {
 	sendTo(ws, { type: 'layoutLoaded', layout });
 });
 
-// -- Restore agents from persistence --
-restoreAgents(
-	nextAgentIdRef, agents, knownJsonlFiles,
-	fileWatchers, pollingTimers, waitingTimers, permissionTimers,
-	jsonlPollTimers, projectScanTimerRef, activeAgentIdRef,
-	broadcast, persistAgents,
-);
-
-// -- Start session scanner --
-sessionScanTimer = startSessionScanner(
-	nextAgentIdRef, agents, knownJsonlFiles,
-	fileWatchers, pollingTimers, waitingTimers, permissionTimers,
-	jsonlPollTimers, broadcast, persistAgents,
-);
-
 // -- Start server --
 server.listen(port, () => {
-	console.log(`[Pixel Agents] Server running at http://localhost:${port}`);
-	console.log(`[Pixel Agents] Working directory: ${cwd}`);
-	console.log(`[Pixel Agents] Agents: ${agents.size} restored`);
+	console.log(`[Pixel Office] Server running at http://localhost:${port}`);
+	console.log(`[Pixel Office] Agents join via: bun server/join.ts ws://HOST:${port}/ws --name NAME`);
 });
 
 // -- Graceful shutdown --
 function cleanup(): void {
-	console.log('\n[Pixel Agents] Shutting down...');
-	if (sessionScanTimer) clearInterval(sessionScanTimer);
+	console.log('\n[Pixel Office] Shutting down...');
 	layoutWatcher?.dispose();
-	if (projectScanTimerRef.current) clearInterval(projectScanTimerRef.current);
-	for (const timer of pollingTimers.values()) clearInterval(timer);
-	for (const timer of jsonlPollTimers.values()) clearInterval(timer);
-	for (const watcher of fileWatchers.values()) watcher.close();
 	disposeWs();
 	server.close();
 	process.exit(0);
