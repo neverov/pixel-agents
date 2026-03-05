@@ -197,6 +197,7 @@ export function SettingsModal({ isOpen, onClose, isDebugMode, onToggleDebugMode 
           onMouseLeave={() => setHovered(null)}
           style={{
             ...menuItemBase,
+            display: 'none',
             background: hovered === 'debug' ? 'rgba(255, 255, 255, 0.08)' : 'transparent',
           }}
         >
