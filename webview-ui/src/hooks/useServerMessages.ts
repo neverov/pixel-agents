@@ -3,12 +3,9 @@ import type { OfficeState } from '../office/engine/officeState.js'
 import type { OfficeLayout, ToolActivity } from '../office/types.js'
 import { extractToolName } from '../office/toolUtils.js'
 import { migrateLayoutColors } from '../office/layout/layoutSerializer.js'
-import { buildDynamicCatalog } from '../office/layout/furnitureCatalog.js'
-import { setFloorSprites } from '../office/floorTiles.js'
-import { setWallSprites } from '../office/wallTiles.js'
-import { setCharacterTemplates } from '../office/sprites/spriteData.js'
-import { vscode } from '../vscodeApi.js'
+import { serverApi } from '../serverApi.js'
 import { playDoneSound, setSoundEnabled } from '../notificationSound.js'
+import { initAssets } from '../assetLoader.js'
 
 export interface SubagentCharacter {
   id: number
@@ -17,30 +14,7 @@ export interface SubagentCharacter {
   label: string
 }
 
-export interface FurnitureAsset {
-  id: string
-  name: string
-  label: string
-  category: string
-  file: string
-  width: number
-  height: number
-  footprintW: number
-  footprintH: number
-  isDesk: boolean
-  canPlaceOnWalls: boolean
-  partOfGroup?: boolean
-  groupId?: string
-  canPlaceOnSurfaces?: boolean
-  backgroundTiles?: number
-}
-
-export interface WorkspaceFolder {
-  name: string
-  path: string
-}
-
-export interface ExtensionMessageState {
+export interface ServerMessageState {
   agents: number[]
   selectedAgent: number | null
   agentTools: Record<number, ToolActivity[]>
@@ -48,8 +22,6 @@ export interface ExtensionMessageState {
   subagentTools: Record<number, Record<string, ToolActivity[]>>
   subagentCharacters: SubagentCharacter[]
   layoutReady: boolean
-  loadedAssets?: { catalog: FurnitureAsset[]; sprites: Record<string, string[][]> }
-  workspaceFolders: WorkspaceFolder[]
 }
 
 function saveAgentSeats(os: OfficeState): void {
@@ -58,14 +30,14 @@ function saveAgentSeats(os: OfficeState): void {
     if (ch.isSubagent) continue
     seats[ch.id] = { palette: ch.palette, hueShift: ch.hueShift, seatId: ch.seatId }
   }
-  vscode.postMessage({ type: 'saveAgentSeats', seats })
+  serverApi.postMessage({ type: 'saveAgentSeats', seats })
 }
 
-export function useExtensionMessages(
+export function useServerMessages(
   getOfficeState: () => OfficeState,
   onLayoutLoaded?: (layout: OfficeLayout) => void,
   isEditDirty?: () => boolean,
-): ExtensionMessageState {
+): ServerMessageState {
   const [agents, setAgents] = useState<number[]>([])
   const [selectedAgent, setSelectedAgent] = useState<number | null>(null)
   const [agentTools, setAgentTools] = useState<Record<number, ToolActivity[]>>({})
@@ -73,22 +45,16 @@ export function useExtensionMessages(
   const [subagentTools, setSubagentTools] = useState<Record<number, Record<string, ToolActivity[]>>>({})
   const [subagentCharacters, setSubagentCharacters] = useState<SubagentCharacter[]>([])
   const [layoutReady, setLayoutReady] = useState(false)
-  const [loadedAssets, setLoadedAssets] = useState<{ catalog: FurnitureAsset[]; sprites: Record<string, string[][]> } | undefined>()
-  const [workspaceFolders, setWorkspaceFolders] = useState<WorkspaceFolder[]>([])
 
-  // Track whether initial layout has been loaded (ref to avoid re-render)
   const layoutReadyRef = useRef(false)
 
   useEffect(() => {
-    // Buffer agents from existingAgents until layout is loaded
     let pendingAgents: Array<{ id: number; palette?: number; hueShift?: number; seatId?: string; folderName?: string }> = []
 
-    const handler = (e: MessageEvent) => {
-      const msg = e.data
+    const handler = (msg: Record<string, unknown>) => {
       const os = getOfficeState()
 
       if (msg.type === 'layoutLoaded') {
-        // Skip external layout updates while editor has unsaved changes
         if (layoutReadyRef.current && isEditDirty?.()) {
           console.log('[Webview] Skipping external layout update — editor has unsaved changes')
           return
@@ -99,10 +65,8 @@ export function useExtensionMessages(
           os.rebuildFromLayout(layout)
           onLayoutLoaded?.(layout)
         } else {
-          // Default layout — snapshot whatever OfficeState built
           onLayoutLoaded?.(os.getLayout())
         }
-        // Add buffered agents now that layout (and seats) are correct
         for (const p of pendingAgents) {
           os.addAgent(p.id, p.palette, p.hueShift, p.seatId, true, p.folderName)
         }
@@ -141,7 +105,6 @@ export function useExtensionMessages(
           delete next[id]
           return next
         })
-        // Remove all sub-agent characters belonging to this agent
         os.removeAllSubagents(id)
         setSubagentCharacters((prev) => prev.filter((s) => s.parentAgentId !== id))
         os.removeAgent(id)
@@ -149,7 +112,6 @@ export function useExtensionMessages(
         const incoming = msg.agents as number[]
         const meta = (msg.agentMeta || {}) as Record<number, { palette?: number; hueShift?: number; seatId?: string }>
         const folderNames = (msg.folderNames || {}) as Record<number, string>
-        // Buffer agents — they'll be added in layoutLoaded after seats are built
         for (const id of incoming) {
           const m = meta[id]
           pendingAgents.push({ id, palette: m?.palette, hueShift: m?.hueShift, seatId: m?.seatId, folderName: folderNames[id] })
@@ -177,7 +139,6 @@ export function useExtensionMessages(
         os.setAgentTool(id, toolName)
         os.setAgentActive(id, true)
         os.clearPermissionBubble(id)
-        // Create sub-agent character for Task tool subtasks
         if (status.startsWith('Subtask:')) {
           const label = status.slice('Subtask:'.length).trim()
           const subId = os.addSubagent(id, toolId)
@@ -211,7 +172,6 @@ export function useExtensionMessages(
           delete next[id]
           return next
         })
-        // Remove all sub-agent characters belonging to this agent
         os.removeAllSubagents(id)
         setSubagentCharacters((prev) => prev.filter((s) => s.parentAgentId !== id))
         os.setAgentTool(id, null)
@@ -250,7 +210,6 @@ export function useExtensionMessages(
       } else if (msg.type === 'subagentToolPermission') {
         const id = msg.id as number
         const parentToolId = msg.parentToolId as string
-        // Show permission bubble on the sub-agent character
         const subId = os.getSubagentId(id, parentToolId)
         if (subId !== null) {
           os.showPermissionBubble(subId)
@@ -268,7 +227,6 @@ export function useExtensionMessages(
           }
         })
         os.clearPermissionBubble(id)
-        // Also clear permission bubbles on all sub-agent characters of this parent
         for (const [subId, meta] of os.subagentMeta) {
           if (meta.parentAgentId === id) {
             os.clearPermissionBubble(subId)
@@ -285,7 +243,6 @@ export function useExtensionMessages(
           if (list.some((t) => t.toolId === toolId)) return prev
           return { ...prev, [id]: { ...agentSubs, [parentToolId]: [...list, { toolId, status, done: false }] } }
         })
-        // Update sub-agent character's tool and active state
         const subId = os.getSubagentId(id, parentToolId)
         if (subId !== null) {
           const subToolName = extractToolName(status)
@@ -321,44 +278,25 @@ export function useExtensionMessages(
           }
           return { ...prev, [id]: next }
         })
-        // Remove sub-agent character
         os.removeSubagent(id, parentToolId)
         setSubagentCharacters((prev) => prev.filter((s) => !(s.parentAgentId === id && s.parentToolId === parentToolId)))
-      } else if (msg.type === 'characterSpritesLoaded') {
-        const characters = msg.characters as Array<{ down: string[][][]; up: string[][][]; right: string[][][] }>
-        console.log(`[Webview] Received ${characters.length} pre-colored character sprites`)
-        setCharacterTemplates(characters)
-      } else if (msg.type === 'floorTilesLoaded') {
-        const sprites = msg.sprites as string[][][]
-        console.log(`[Webview] Received ${sprites.length} floor tile patterns`)
-        setFloorSprites(sprites)
-      } else if (msg.type === 'wallTilesLoaded') {
-        const sprites = msg.sprites as string[][][]
-        console.log(`[Webview] Received ${sprites.length} wall tile sprites`)
-        setWallSprites(sprites)
-      } else if (msg.type === 'workspaceFolders') {
-        const folders = msg.folders as WorkspaceFolder[]
-        setWorkspaceFolders(folders)
       } else if (msg.type === 'settingsLoaded') {
         const soundOn = msg.soundEnabled as boolean
         setSoundEnabled(soundOn)
-      } else if (msg.type === 'furnitureAssetsLoaded') {
-        try {
-          const catalog = msg.catalog as FurnitureAsset[]
-          const sprites = msg.sprites as Record<string, string[][]>
-          console.log(`📦 Webview: Loaded ${catalog.length} furniture assets`)
-          // Build dynamic catalog immediately so getCatalogEntry() works when layoutLoaded arrives next
-          buildDynamicCatalog({ catalog, sprites })
-          setLoadedAssets({ catalog, sprites })
-        } catch (err) {
-          console.error(`❌ Webview: Error processing furnitureAssetsLoaded:`, err)
-        }
       }
     }
-    window.addEventListener('message', handler)
-    vscode.postMessage({ type: 'webviewReady' })
-    return () => window.removeEventListener('message', handler)
+
+    let unsubscribe: (() => void) | null = null
+
+    // Load assets first, then register message handler so layoutLoaded
+    // doesn't fire before furniture catalog is available
+    void initAssets().then(() => {
+      unsubscribe = serverApi.onMessage(handler)
+      serverApi.postMessage({ type: 'webviewReady' })
+    })
+
+    return () => unsubscribe?.()
   }, [getOfficeState])
 
-  return { agents, selectedAgent, agentTools, agentStatuses, subagentTools, subagentCharacters, layoutReady, loadedAssets, workspaceFolders }
+  return { agents, selectedAgent, agentTools, agentStatuses, subagentTools, subagentCharacters, layoutReady }
 }

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { vscode } from '../vscodeApi.js'
+import { serverApi } from '../serverApi.js'
 import { isSoundEnabled, setSoundEnabled } from '../notificationSound.js'
 
 interface SettingsModalProps {
@@ -94,21 +94,22 @@ export function SettingsModal({ isOpen, onClose, isDebugMode, onToggleDebugMode 
         {/* Menu items */}
         <button
           onClick={() => {
-            vscode.postMessage({ type: 'openSessionsFolder' })
-            onClose()
-          }}
-          onMouseEnter={() => setHovered('sessions')}
-          onMouseLeave={() => setHovered(null)}
-          style={{
-            ...menuItemBase,
-            background: hovered === 'sessions' ? 'rgba(255, 255, 255, 0.08)' : 'transparent',
-          }}
-        >
-          Open Sessions Folder
-        </button>
-        <button
-          onClick={() => {
-            vscode.postMessage({ type: 'exportLayout' })
+            // Export layout via browser download
+            void (async () => {
+              try {
+                const res = await fetch('/api/layout')
+                const layout = await res.json()
+                const blob = new Blob([JSON.stringify(layout, null, 2)], { type: 'application/json' })
+                const url = URL.createObjectURL(blob)
+                const a = document.createElement('a')
+                a.href = url
+                a.download = 'pixel-agents-layout.json'
+                a.click()
+                URL.revokeObjectURL(url)
+              } catch (err) {
+                console.error('[Settings] Export failed:', err)
+              }
+            })()
             onClose()
           }}
           onMouseEnter={() => setHovered('export')}
@@ -122,7 +123,29 @@ export function SettingsModal({ isOpen, onClose, isDebugMode, onToggleDebugMode 
         </button>
         <button
           onClick={() => {
-            vscode.postMessage({ type: 'importLayout' })
+            // Import layout via browser file picker
+            const input = document.createElement('input')
+            input.type = 'file'
+            input.accept = '.json'
+            input.onchange = () => {
+              const file = input.files?.[0]
+              if (!file) return
+              const reader = new FileReader()
+              reader.onload = () => {
+                try {
+                  const layout = JSON.parse(reader.result as string)
+                  if (layout.version !== 1 || !Array.isArray(layout.tiles)) {
+                    console.error('[Settings] Invalid layout file')
+                    return
+                  }
+                  serverApi.postMessage({ type: 'importLayout', layout })
+                } catch (err) {
+                  console.error('[Settings] Import parse error:', err)
+                }
+              }
+              reader.readAsText(file)
+            }
+            input.click()
             onClose()
           }}
           onMouseEnter={() => setHovered('import')}
@@ -139,7 +162,7 @@ export function SettingsModal({ isOpen, onClose, isDebugMode, onToggleDebugMode 
             const newVal = !isSoundEnabled()
             setSoundEnabled(newVal)
             setSoundLocal(newVal)
-            vscode.postMessage({ type: 'setSoundEnabled', enabled: newVal })
+            serverApi.postMessage({ type: 'setSoundEnabled', enabled: newVal })
           }}
           onMouseEnter={() => setHovered('sound')}
           onMouseLeave={() => setHovered(null)}

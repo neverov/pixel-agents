@@ -1,6 +1,5 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import * as vscode from 'vscode';
 import type { AgentState } from './types.js';
 import { cancelWaitingTimer, cancelPermissionTimer, clearAgentActivity } from './timerManager.js';
 import { processTranscriptLine } from './transcriptParser.js';
@@ -14,12 +13,12 @@ export function startFileWatching(
 	pollingTimers: Map<number, ReturnType<typeof setInterval>>,
 	waitingTimers: Map<number, ReturnType<typeof setTimeout>>,
 	permissionTimers: Map<number, ReturnType<typeof setTimeout>>,
-	webview: vscode.Webview | undefined,
+	emit: (msg: unknown) => void,
 ): void {
-	// Primary: fs.watch (unreliable on macOS — may miss events)
+	// Primary: fs.watch
 	try {
 		const watcher = fs.watch(filePath, () => {
-			readNewLines(agentId, agents, waitingTimers, permissionTimers, webview);
+			readNewLines(agentId, agents, waitingTimers, permissionTimers, emit);
 		});
 		fileWatchers.set(agentId, watcher);
 	} catch (e) {
@@ -29,20 +28,20 @@ export function startFileWatching(
 	// Secondary: fs.watchFile (stat-based polling, reliable on macOS)
 	try {
 		fs.watchFile(filePath, { interval: FILE_WATCHER_POLL_INTERVAL_MS }, () => {
-			readNewLines(agentId, agents, waitingTimers, permissionTimers, webview);
+			readNewLines(agentId, agents, waitingTimers, permissionTimers, emit);
 		});
 	} catch (e) {
 		console.log(`[Pixel Agents] fs.watchFile failed for agent ${agentId}: ${e}`);
 	}
 
-	// Tertiary: manual poll as last resort
+	// Tertiary: manual poll
 	const interval = setInterval(() => {
 		if (!agents.has(agentId)) {
 			clearInterval(interval);
 			try { fs.unwatchFile(filePath); } catch { /* ignore */ }
 			return;
 		}
-		readNewLines(agentId, agents, waitingTimers, permissionTimers, webview);
+		readNewLines(agentId, agents, waitingTimers, permissionTimers, emit);
 	}, FILE_WATCHER_POLL_INTERVAL_MS);
 	pollingTimers.set(agentId, interval);
 }
@@ -52,7 +51,7 @@ export function readNewLines(
 	agents: Map<number, AgentState>,
 	waitingTimers: Map<number, ReturnType<typeof setTimeout>>,
 	permissionTimers: Map<number, ReturnType<typeof setTimeout>>,
-	webview: vscode.Webview | undefined,
+	emit: (msg: unknown) => void,
 ): void {
 	const agent = agents.get(agentId);
 	if (!agent) return;
@@ -72,18 +71,17 @@ export function readNewLines(
 
 		const hasLines = lines.some(l => l.trim());
 		if (hasLines) {
-			// New data arriving — cancel timers (data flowing means agent is still active)
 			cancelWaitingTimer(agentId, waitingTimers);
 			cancelPermissionTimer(agentId, permissionTimers);
 			if (agent.permissionSent) {
 				agent.permissionSent = false;
-				webview?.postMessage({ type: 'agentToolPermissionClear', id: agentId });
+				emit({ type: 'agentToolPermissionClear', id: agentId });
 			}
 		}
 
 		for (const line of lines) {
 			if (!line.trim()) continue;
-			processTranscriptLine(agentId, line, agents, waitingTimers, permissionTimers, webview);
+			processTranscriptLine(agentId, line, agents, waitingTimers, permissionTimers, emit);
 		}
 	} catch (e) {
 		console.log(`[Pixel Agents] Read error for agent ${agentId}: ${e}`);
@@ -101,11 +99,11 @@ export function ensureProjectScan(
 	pollingTimers: Map<number, ReturnType<typeof setInterval>>,
 	waitingTimers: Map<number, ReturnType<typeof setTimeout>>,
 	permissionTimers: Map<number, ReturnType<typeof setTimeout>>,
-	webview: vscode.Webview | undefined,
+	emit: (msg: unknown) => void,
 	persistAgents: () => void,
 ): void {
 	if (projectScanTimerRef.current) return;
-	// Seed with all existing JSONL files so we only react to truly new ones
+	// Seed with all existing JSONL files
 	try {
 		const files = fs.readdirSync(projectDir)
 			.filter(f => f.endsWith('.jsonl'))
@@ -119,7 +117,7 @@ export function ensureProjectScan(
 		scanForNewJsonlFiles(
 			projectDir, knownJsonlFiles, activeAgentIdRef, nextAgentIdRef,
 			agents, fileWatchers, pollingTimers, waitingTimers, permissionTimers,
-			webview, persistAgents,
+			emit, persistAgents,
 		);
 	}, PROJECT_SCAN_INTERVAL_MS);
 }
@@ -134,7 +132,7 @@ function scanForNewJsonlFiles(
 	pollingTimers: Map<number, ReturnType<typeof setInterval>>,
 	waitingTimers: Map<number, ReturnType<typeof setTimeout>>,
 	permissionTimers: Map<number, ReturnType<typeof setTimeout>>,
-	webview: vscode.Webview | undefined,
+	emit: (msg: unknown) => void,
 	persistAgents: () => void,
 ): void {
 	let files: string[];
@@ -148,40 +146,27 @@ function scanForNewJsonlFiles(
 		if (!knownJsonlFiles.has(file)) {
 			knownJsonlFiles.add(file);
 			if (activeAgentIdRef.current !== null) {
-				// Active agent focused → /clear reassignment
+				// Active agent focused -> /clear reassignment
 				console.log(`[Pixel Agents] New JSONL detected: ${path.basename(file)}, reassigning to agent ${activeAgentIdRef.current}`);
 				reassignAgentToFile(
 					activeAgentIdRef.current, file,
 					agents, fileWatchers, pollingTimers, waitingTimers, permissionTimers,
-					webview, persistAgents,
+					emit, persistAgents,
 				);
 			} else {
-				// No active agent → try to adopt the focused terminal
-				const activeTerminal = vscode.window.activeTerminal;
-				if (activeTerminal) {
-					let owned = false;
-					for (const agent of agents.values()) {
-						if (agent.terminalRef === activeTerminal) {
-							owned = true;
-							break;
-						}
-					}
-					if (!owned) {
-						adoptTerminalForFile(
-							activeTerminal, file, projectDir,
-							nextAgentIdRef, agents, activeAgentIdRef,
-							fileWatchers, pollingTimers, waitingTimers, permissionTimers,
-							webview, persistAgents,
-						);
-					}
-				}
+				// No active agent -> adopt as new agent
+				adoptFileAsAgent(
+					file, projectDir,
+					nextAgentIdRef, agents, activeAgentIdRef,
+					fileWatchers, pollingTimers, waitingTimers, permissionTimers,
+					emit, persistAgents,
+				);
 			}
 		}
 	}
 }
 
-function adoptTerminalForFile(
-	terminal: vscode.Terminal,
+function adoptFileAsAgent(
 	jsonlFile: string,
 	projectDir: string,
 	nextAgentIdRef: { current: number },
@@ -191,13 +176,13 @@ function adoptTerminalForFile(
 	pollingTimers: Map<number, ReturnType<typeof setInterval>>,
 	waitingTimers: Map<number, ReturnType<typeof setTimeout>>,
 	permissionTimers: Map<number, ReturnType<typeof setTimeout>>,
-	webview: vscode.Webview | undefined,
+	emit: (msg: unknown) => void,
 	persistAgents: () => void,
 ): void {
 	const id = nextAgentIdRef.current++;
 	const agent: AgentState = {
 		id,
-		terminalRef: terminal,
+		ptyProcess: null,
 		projectDir,
 		jsonlFile,
 		fileOffset: 0,
@@ -210,17 +195,18 @@ function adoptTerminalForFile(
 		isWaiting: false,
 		permissionSent: false,
 		hadToolsInTurn: false,
+		isExternal: true,
 	};
 
 	agents.set(id, agent);
 	activeAgentIdRef.current = id;
 	persistAgents();
 
-	console.log(`[Pixel Agents] Agent ${id}: adopted terminal "${terminal.name}" for ${path.basename(jsonlFile)}`);
-	webview?.postMessage({ type: 'agentCreated', id });
+	console.log(`[Pixel Agents] Agent ${id}: adopted external session ${path.basename(jsonlFile)}`);
+	emit({ type: 'agentCreated', id });
 
-	startFileWatching(id, jsonlFile, agents, fileWatchers, pollingTimers, waitingTimers, permissionTimers, webview);
-	readNewLines(id, agents, waitingTimers, permissionTimers, webview);
+	startFileWatching(id, jsonlFile, agents, fileWatchers, pollingTimers, waitingTimers, permissionTimers, emit);
+	readNewLines(id, agents, waitingTimers, permissionTimers, emit);
 }
 
 export function reassignAgentToFile(
@@ -231,7 +217,7 @@ export function reassignAgentToFile(
 	pollingTimers: Map<number, ReturnType<typeof setInterval>>,
 	waitingTimers: Map<number, ReturnType<typeof setTimeout>>,
 	permissionTimers: Map<number, ReturnType<typeof setTimeout>>,
-	webview: vscode.Webview | undefined,
+	emit: (msg: unknown) => void,
 	persistAgents: () => void,
 ): void {
 	const agent = agents.get(agentId);
@@ -248,7 +234,7 @@ export function reassignAgentToFile(
 	// Clear activity
 	cancelWaitingTimer(agentId, waitingTimers);
 	cancelPermissionTimer(agentId, permissionTimers);
-	clearAgentActivity(agent, agentId, permissionTimers, webview);
+	clearAgentActivity(agent, agentId, permissionTimers, emit);
 
 	// Swap to new file
 	agent.jsonlFile = newFilePath;
@@ -257,6 +243,6 @@ export function reassignAgentToFile(
 	persistAgents();
 
 	// Start watching new file
-	startFileWatching(agentId, newFilePath, agents, fileWatchers, pollingTimers, waitingTimers, permissionTimers, webview);
-	readNewLines(agentId, agents, waitingTimers, permissionTimers, webview);
+	startFileWatching(agentId, newFilePath, agents, fileWatchers, pollingTimers, waitingTimers, permissionTimers, emit);
+	readNewLines(agentId, agents, waitingTimers, permissionTimers, emit);
 }

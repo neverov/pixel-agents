@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import type { OfficeState } from '../office/engine/officeState.js'
-import type { SubagentCharacter } from '../hooks/useExtensionMessages.js'
+import type { SubagentCharacter } from '../hooks/useServerMessages.js'
 import { TILE_SIZE, CharacterState } from '../office/types.js'
 
 interface AgentLabelsProps {

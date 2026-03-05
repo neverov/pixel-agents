@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import type { ToolActivity } from '../types.js'
 import type { OfficeState } from '../engine/officeState.js'
-import type { SubagentCharacter } from '../../hooks/useExtensionMessages.js'
+import type { SubagentCharacter } from '../../hooks/useServerMessages.js'
 import { TILE_SIZE, CharacterState } from '../types.js'
 import { TOOL_OVERLAY_VERTICAL_OFFSET, CHARACTER_SITTING_OFFSET_PX } from '../../constants.js'
 

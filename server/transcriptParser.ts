@@ -1,5 +1,4 @@
 import * as path from 'path';
-import type * as vscode from 'vscode';
 import type { AgentState } from './types.js';
 import {
 	cancelWaitingTimer,
@@ -48,7 +47,7 @@ export function processTranscriptLine(
 	agents: Map<number, AgentState>,
 	waitingTimers: Map<number, ReturnType<typeof setTimeout>>,
 	permissionTimers: Map<number, ReturnType<typeof setTimeout>>,
-	webview: vscode.Webview | undefined,
+	emit: (msg: unknown) => void,
 ): void {
 	const agent = agents.get(agentId);
 	if (!agent) return;
@@ -65,7 +64,7 @@ export function processTranscriptLine(
 				cancelWaitingTimer(agentId, waitingTimers);
 				agent.isWaiting = false;
 				agent.hadToolsInTurn = true;
-				webview?.postMessage({ type: 'agentStatus', id: agentId, status: 'active' });
+				emit({ type: 'agentStatus', id: agentId, status: 'active' });
 				let hasNonExemptTool = false;
 				for (const block of blocks) {
 					if (block.type === 'tool_use' && block.id) {
@@ -78,7 +77,7 @@ export function processTranscriptLine(
 						if (!PERMISSION_EXEMPT_TOOLS.has(toolName)) {
 							hasNonExemptTool = true;
 						}
-						webview?.postMessage({
+						emit({
 							type: 'agentToolStart',
 							id: agentId,
 							toolId: block.id,
@@ -87,17 +86,13 @@ export function processTranscriptLine(
 					}
 				}
 				if (hasNonExemptTool) {
-					startPermissionTimer(agentId, agents, permissionTimers, PERMISSION_EXEMPT_TOOLS, webview);
+					startPermissionTimer(agentId, agents, permissionTimers, PERMISSION_EXEMPT_TOOLS, emit);
 				}
 			} else if (blocks.some(b => b.type === 'text') && !agent.hadToolsInTurn) {
-				// Text-only response in a turn that hasn't used any tools.
-				// turn_duration handles tool-using turns reliably but is never
-				// emitted for text-only turns, so we use a silence-based timer:
-				// if no new JSONL data arrives within TEXT_IDLE_DELAY_MS, mark as waiting.
-				startWaitingTimer(agentId, TEXT_IDLE_DELAY_MS, agents, waitingTimers, webview);
+				startWaitingTimer(agentId, TEXT_IDLE_DELAY_MS, agents, waitingTimers, emit);
 			}
 		} else if (record.type === 'progress') {
-			processProgressRecord(agentId, record, agents, waitingTimers, permissionTimers, webview);
+			processProgressRecord(agentId, record, agents, waitingTimers, permissionTimers, emit);
 		} else if (record.type === 'user') {
 			const content = record.message?.content;
 			if (Array.isArray(content)) {
@@ -108,11 +103,10 @@ export function processTranscriptLine(
 						if (block.type === 'tool_result' && block.tool_use_id) {
 							console.log(`[Pixel Agents] Agent ${agentId} tool done: ${block.tool_use_id}`);
 							const completedToolId = block.tool_use_id;
-							// If the completed tool was a Task, clear its subagent tools
 							if (agent.activeToolNames.get(completedToolId) === 'Task') {
 								agent.activeSubagentToolIds.delete(completedToolId);
 								agent.activeSubagentToolNames.delete(completedToolId);
-								webview?.postMessage({
+								emit({
 									type: 'subagentClear',
 									id: agentId,
 									parentToolId: completedToolId,
@@ -123,7 +117,7 @@ export function processTranscriptLine(
 							agent.activeToolNames.delete(completedToolId);
 							const toolId = completedToolId;
 							setTimeout(() => {
-								webview?.postMessage({
+								emit({
 									type: 'agentToolDone',
 									id: agentId,
 									toolId,
@@ -131,41 +125,36 @@ export function processTranscriptLine(
 							}, TOOL_DONE_DELAY_MS);
 						}
 					}
-					// All tools completed — allow text-idle timer as fallback
-					// for turn-end detection when turn_duration is not emitted
 					if (agent.activeToolIds.size === 0) {
 						agent.hadToolsInTurn = false;
 					}
 				} else {
-					// New user text prompt — new turn starting
 					cancelWaitingTimer(agentId, waitingTimers);
-					clearAgentActivity(agent, agentId, permissionTimers, webview);
+					clearAgentActivity(agent, agentId, permissionTimers, emit);
 					agent.hadToolsInTurn = false;
 				}
 			} else if (typeof content === 'string' && content.trim()) {
-				// New user text prompt — new turn starting
 				cancelWaitingTimer(agentId, waitingTimers);
-				clearAgentActivity(agent, agentId, permissionTimers, webview);
+				clearAgentActivity(agent, agentId, permissionTimers, emit);
 				agent.hadToolsInTurn = false;
 			}
 		} else if (record.type === 'system' && record.subtype === 'turn_duration') {
 			cancelWaitingTimer(agentId, waitingTimers);
 			cancelPermissionTimer(agentId, permissionTimers);
 
-			// Definitive turn-end: clean up any stale tool state
 			if (agent.activeToolIds.size > 0) {
 				agent.activeToolIds.clear();
 				agent.activeToolStatuses.clear();
 				agent.activeToolNames.clear();
 				agent.activeSubagentToolIds.clear();
 				agent.activeSubagentToolNames.clear();
-				webview?.postMessage({ type: 'agentToolsClear', id: agentId });
+				emit({ type: 'agentToolsClear', id: agentId });
 			}
 
 			agent.isWaiting = true;
 			agent.permissionSent = false;
 			agent.hadToolsInTurn = false;
-			webview?.postMessage({
+			emit({
 				type: 'agentStatus',
 				id: agentId,
 				status: 'waiting',
@@ -180,9 +169,9 @@ function processProgressRecord(
 	agentId: number,
 	record: Record<string, unknown>,
 	agents: Map<number, AgentState>,
-	waitingTimers: Map<number, ReturnType<typeof setTimeout>>,
+	_waitingTimers: Map<number, ReturnType<typeof setTimeout>>,
 	permissionTimers: Map<number, ReturnType<typeof setTimeout>>,
-	webview: vscode.Webview | undefined,
+	emit: (msg: unknown) => void,
 ): void {
 	const agent = agents.get(agentId);
 	if (!agent) return;
@@ -193,17 +182,14 @@ function processProgressRecord(
 	const data = record.data as Record<string, unknown> | undefined;
 	if (!data) return;
 
-	// bash_progress / mcp_progress: tool is actively executing, not stuck on permission.
-	// Restart the permission timer to give the running tool another window.
 	const dataType = data.type as string | undefined;
 	if (dataType === 'bash_progress' || dataType === 'mcp_progress') {
 		if (agent.activeToolIds.has(parentToolId)) {
-			startPermissionTimer(agentId, agents, permissionTimers, PERMISSION_EXEMPT_TOOLS, webview);
+			startPermissionTimer(agentId, agents, permissionTimers, PERMISSION_EXEMPT_TOOLS, emit);
 		}
 		return;
 	}
 
-	// Verify parent is an active Task tool (agent_progress handling)
 	if (agent.activeToolNames.get(parentToolId) !== 'Task') return;
 
 	const msg = data.message as Record<string, unknown> | undefined;
@@ -222,7 +208,6 @@ function processProgressRecord(
 				const status = formatToolStatus(toolName, block.input || {});
 				console.log(`[Pixel Agents] Agent ${agentId} subagent tool start: ${block.id} ${status} (parent: ${parentToolId})`);
 
-				// Track sub-tool IDs
 				let subTools = agent.activeSubagentToolIds.get(parentToolId);
 				if (!subTools) {
 					subTools = new Set();
@@ -230,7 +215,6 @@ function processProgressRecord(
 				}
 				subTools.add(block.id);
 
-				// Track sub-tool names (for permission checking)
 				let subNames = agent.activeSubagentToolNames.get(parentToolId);
 				if (!subNames) {
 					subNames = new Map();
@@ -242,7 +226,7 @@ function processProgressRecord(
 					hasNonExemptSubTool = true;
 				}
 
-				webview?.postMessage({
+				emit({
 					type: 'subagentToolStart',
 					id: agentId,
 					parentToolId,
@@ -252,14 +236,13 @@ function processProgressRecord(
 			}
 		}
 		if (hasNonExemptSubTool) {
-			startPermissionTimer(agentId, agents, permissionTimers, PERMISSION_EXEMPT_TOOLS, webview);
+			startPermissionTimer(agentId, agents, permissionTimers, PERMISSION_EXEMPT_TOOLS, emit);
 		}
 	} else if (msgType === 'user') {
 		for (const block of content) {
 			if (block.type === 'tool_result' && block.tool_use_id) {
 				console.log(`[Pixel Agents] Agent ${agentId} subagent tool done: ${block.tool_use_id} (parent: ${parentToolId})`);
 
-				// Remove from tracking
 				const subTools = agent.activeSubagentToolIds.get(parentToolId);
 				if (subTools) {
 					subTools.delete(block.tool_use_id);
@@ -271,7 +254,7 @@ function processProgressRecord(
 
 				const toolId = block.tool_use_id;
 				setTimeout(() => {
-					webview?.postMessage({
+					emit({
 						type: 'subagentToolDone',
 						id: agentId,
 						parentToolId,
@@ -280,8 +263,6 @@ function processProgressRecord(
 				}, 300);
 			}
 		}
-		// If there are still active non-exempt sub-agent tools, restart the permission timer
-		// (handles the case where one sub-agent completes but another is still stuck)
 		let stillHasNonExempt = false;
 		for (const [, subNames] of agent.activeSubagentToolNames) {
 			for (const [, toolName] of subNames) {
@@ -293,7 +274,7 @@ function processProgressRecord(
 			if (stillHasNonExempt) break;
 		}
 		if (stillHasNonExempt) {
-			startPermissionTimer(agentId, agents, permissionTimers, PERMISSION_EXEMPT_TOOLS, webview);
+			startPermissionTimer(agentId, agents, permissionTimers, PERMISSION_EXEMPT_TOOLS, emit);
 		}
 	}
 }

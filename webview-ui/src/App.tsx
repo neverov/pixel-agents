@@ -6,8 +6,8 @@ import { EditorToolbar } from './office/editor/EditorToolbar.js'
 import { EditorState } from './office/editor/editorState.js'
 import { EditTool } from './office/types.js'
 import { isRotatable } from './office/layout/furnitureCatalog.js'
-import { vscode } from './vscodeApi.js'
-import { useExtensionMessages } from './hooks/useExtensionMessages.js'
+import { serverApi } from './serverApi.js'
+import { useServerMessages } from './hooks/useServerMessages.js'
 import { PULSE_ANIMATION_DURATION_SEC } from './constants.js'
 import { useEditorActions } from './hooks/useEditorActions.js'
 import { useEditorKeyboard } from './hooks/useEditorKeyboard.js'
@@ -121,14 +121,14 @@ function App() {
 
   const isEditDirty = useCallback(() => editor.isEditMode && editor.isDirty, [editor.isEditMode, editor.isDirty])
 
-  const { agents, selectedAgent, agentTools, agentStatuses, subagentTools, subagentCharacters, layoutReady, loadedAssets, workspaceFolders } = useExtensionMessages(getOfficeState, editor.setLastSavedLayout, isEditDirty)
+  const { agents, selectedAgent, agentTools, agentStatuses, subagentTools, subagentCharacters, layoutReady } = useServerMessages(getOfficeState, editor.setLastSavedLayout, isEditDirty)
 
   const [isDebugMode, setIsDebugMode] = useState(false)
 
   const handleToggleDebugMode = useCallback(() => setIsDebugMode((prev) => !prev), [])
 
   const handleSelectAgent = useCallback((id: number) => {
-    vscode.postMessage({ type: 'focusAgent', id })
+    serverApi.postMessage({ type: 'focusAgent', id })
   }, [])
 
   const containerRef = useRef<HTMLDivElement>(null)
@@ -147,7 +147,7 @@ function App() {
   )
 
   const handleCloseAgent = useCallback((id: number) => {
-    vscode.postMessage({ type: 'closeAgent', id })
+    serverApi.postMessage({ type: 'closeAgent', id })
   }, [])
 
   const handleClick = useCallback((agentId: number) => {
@@ -155,7 +155,7 @@ function App() {
     const os = getOfficeState()
     const meta = os.subagentMeta.get(agentId)
     const focusId = meta ? meta.parentAgentId : agentId
-    vscode.postMessage({ type: 'focusAgent', id: focusId })
+    serverApi.postMessage({ type: 'focusAgent', id: focusId })
   }, [])
 
   const officeState = getOfficeState()
@@ -229,7 +229,6 @@ function App() {
         onToggleEditMode={editor.handleToggleEditMode}
         isDebugMode={isDebugMode}
         onToggleDebugMode={handleToggleDebugMode}
-        workspaceFolders={workspaceFolders}
       />
 
       {editor.isEditMode && editor.isDirty && (
@@ -280,7 +279,7 @@ function App() {
             onWallColorChange={editor.handleWallColorChange}
             onSelectedFurnitureColorChange={editor.handleSelectedFurnitureColorChange}
             onFurnitureTypeChange={editor.handleFurnitureTypeChange}
-            loadedAssets={loadedAssets}
+            loadedAssets={undefined}
           />
         )
       })()}

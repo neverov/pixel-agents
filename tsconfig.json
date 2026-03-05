@@ -6,14 +6,16 @@
 			"ES2022"
 		],
 		"sourceMap": true,
-		"rootDir": "src",
-		"strict": true
+		"rootDir": "server",
+		"strict": true,
+		"skipLibCheck": true
 	},
 	"exclude": [
 		"node_modules",
 		"webview-ui",
 		"dist",
 		"out",
-		"scripts"
+		"scripts",
+		"src"
 	]
 }

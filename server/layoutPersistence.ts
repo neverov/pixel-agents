@@ -1,8 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import type { ExtensionContext } from 'vscode';
-import { LAYOUT_FILE_DIR, LAYOUT_FILE_NAME, LAYOUT_FILE_POLL_INTERVAL_MS, WORKSPACE_KEY_LAYOUT } from './constants.js';
+import { LAYOUT_FILE_DIR, LAYOUT_FILE_NAME, LAYOUT_FILE_POLL_INTERVAL_MS } from './constants.js';
 
 export interface LayoutWatcher {
 	markOwnWrite(): void;
@@ -42,46 +41,32 @@ export function writeLayoutToFile(layout: Record<string, unknown>): void {
 }
 
 /**
- * Load layout with migration from workspace state:
- * 1. If file exists → return it
- * 2. Else if workspace state has layout → write to file, clear workspace state, return it
- * 3. Else if defaultLayout provided → write to file, return it
- * 4. Else → return null
+ * Load layout:
+ * 1. If file exists -> return it
+ * 2. Else if defaultLayout provided -> write to file, return it
+ * 3. Else -> return null
  */
-export function migrateAndLoadLayout(
-	context: ExtensionContext,
+export function loadLayout(
 	defaultLayout?: Record<string, unknown> | null,
 ): Record<string, unknown> | null {
-	// 1. Try file
 	const fromFile = readLayoutFromFile();
 	if (fromFile) {
 		console.log('[Pixel Agents] Layout loaded from file');
 		return fromFile;
 	}
 
-	// 2. Migrate from workspace state
-	const fromState = context.workspaceState.get<Record<string, unknown>>(WORKSPACE_KEY_LAYOUT);
-	if (fromState) {
-		console.log('[Pixel Agents] Migrating layout from workspace state to file');
-		writeLayoutToFile(fromState);
-		context.workspaceState.update(WORKSPACE_KEY_LAYOUT, undefined);
-		return fromState;
-	}
-
-	// 3. Use bundled default
 	if (defaultLayout) {
 		console.log('[Pixel Agents] Writing bundled default layout to file');
 		writeLayoutToFile(defaultLayout);
 		return defaultLayout;
 	}
 
-	// 4. Nothing
 	return null;
 }
 
 /**
- * Watch ~/.pixel-agents/layout.json for external changes (other VS Code windows).
- * Uses hybrid fs.watch + polling (same pattern as JSONL watching).
+ * Watch ~/.pixel-agents/layout.json for external changes.
+ * Uses hybrid fs.watch + polling.
  */
 export function watchLayoutFile(
 	onExternalChange: (layout: Record<string, unknown>) => void,
@@ -93,7 +78,6 @@ export function watchLayoutFile(
 	let pollTimer: ReturnType<typeof setInterval> | null = null;
 	let disposed = false;
 
-	// Initialize lastMtime
 	try {
 		if (fs.existsSync(filePath)) {
 			lastMtime = fs.statSync(filePath).mtimeMs;
@@ -130,19 +114,16 @@ export function watchLayoutFile(
 				checkForChange();
 			});
 			fsWatcher.on('error', () => {
-				// fs.watch can be unreliable — polling backup handles it
 				fsWatcher?.close();
 				fsWatcher = null;
 			});
 		} catch {
-			// File may not exist yet — polling will retry
+			// File may not exist yet
 		}
 	}
 
-	// Start fs.watch if file exists
 	startFsWatch();
 
-	// Polling backup (also starts fs.watch if file appears)
 	pollTimer = setInterval(() => {
 		if (disposed) return;
 		if (!fsWatcher) {
@@ -154,7 +135,6 @@ export function watchLayoutFile(
 	return {
 		markOwnWrite(): void {
 			skipNextChange = true;
-			// Update lastMtime preemptively so a near-instant poll doesn't miss the flag
 			try {
 				if (fs.existsSync(filePath)) {
 					lastMtime = fs.statSync(filePath).mtimeMs;

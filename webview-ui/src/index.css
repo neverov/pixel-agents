@@ -58,6 +58,8 @@ html, body, #root {
   height: 100%;
   overflow: hidden;
   font-family: 'FS Pixel Sans', sans-serif;
+  color: #fff;
+  background: #1e1e2e;
 }
 
 * {
