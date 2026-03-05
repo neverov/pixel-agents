@@ -16,6 +16,8 @@ import { DEFAULT_PORT } from './constants.js';
 import { feedAgentText, flushAgent } from './chatSummarizer.js';
 import { getPersonaForSession } from './prompts/personas.js';
 import { maskPaths } from './pathMasking.js';
+import { initDb, closeDb } from './db.js';
+import { appendChatMessage, getChatMessages } from './db/chatRepo.js';
 
 // -- Shared state --
 const agents = new Map<number, AgentState>();
@@ -102,6 +104,7 @@ const peerCtx: PeerContext = {
 // -- Chat summarizer callback --
 function onChatSummary(agentId: number, sender: string, summary: string): void {
 	broadcast({ type: 'chatMessage', agentId, sender, text: maskPaths(summary), timestamp: Date.now() });
+	void appendChatMessage({ agentId, sender, text: summary });
 }
 
 // -- Intercept agentText from emit for chat summarization --
@@ -125,9 +128,9 @@ function instrumentedBroadcast(msg: unknown): void {
 peerCtx.emit = instrumentedBroadcast;
 
 // -- WS message handler --
-setMessageHandler((msg, ws) => {
+setMessageHandler(async (msg, ws) => {
 	// Try peer protocol first
-	if (handlePeerMessage(ws, msg, peerCtx)) return;
+	if (await handlePeerMessage(ws, msg, peerCtx)) return;
 
 	if (msg.type === 'saveAgentSeats') {
 		setAgentSeats(msg.seats as Record<string, { palette?: number; hueShift?: number; seatId?: string | null }>);
@@ -155,20 +158,24 @@ setDisconnectHandler((ws) => {
 });
 
 // -- Send initial state to new WS clients --
-setConnectHandler((ws) => {
+setConnectHandler(async (ws) => {
 	const settings = readSettings();
 	sendTo(ws, { type: 'settingsLoaded', soundEnabled: settings.soundEnabled });
+
+	// Send persisted chat history
+	const chatHistory = await getChatMessages();
+	if (chatHistory.length > 0) {
+		sendTo(ws, { type: 'chatHistory', messages: chatHistory });
+	}
 
 	// Send existing agents (all remote, from peers)
 	const agentIds = [...agents.keys()].sort((a, b) => a - b);
 	const agentSeats = settings.agentSeats || {};
 	const folderNames: Record<number, string> = {};
+	const personaTaglines: Record<number, string> = {};
 	for (const [id, agent] of agents) {
 		const displayName = agent.customLabel || agent.label;
 		if (displayName) folderNames[id] = displayName;
-	}
-	const personaTaglines: Record<number, string> = {};
-	for (const [id, agent] of agents) {
 		personaTaglines[id] = getPersonaForSession(agent.sessionId ?? '').tagline;
 	}
 	sendTo(ws, {
@@ -195,9 +202,11 @@ setConnectHandler((ws) => {
 });
 
 // -- Start server --
-server.listen(port, () => {
-	console.log(`[Pixel Office] Server running at http://localhost:${port}`);
-	console.log(`[Pixel Office] Agents join via: bun cli/join.ts ws://HOST:${port}/ws --name NAME`);
+void initDb().then(() => {
+	server.listen(port, () => {
+		console.log(`[Pixel Office] Server running at http://localhost:${port}`);
+		console.log(`[Pixel Office] Agents join via: bun cli/join.ts ws://HOST:${port}/ws --name NAME`);
+	});
 });
 
 // -- Graceful shutdown --
@@ -205,6 +214,7 @@ function cleanup(): void {
 	console.log('\n[Pixel Office] Shutting down...');
 	layoutWatcher?.dispose();
 	disposeWs();
+	void closeDb();
 	server.close();
 	process.exit(0);
 }

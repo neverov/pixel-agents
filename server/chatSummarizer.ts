@@ -54,7 +54,6 @@ export function flushAgent(
 	sessionId: string,
 	onSummary: (agentId: number, sender: string, summary: string) => void,
 ): void {
-	// Store sessionId for agents that only get flushed (no prior feedAgentText)
 	const entry = pending.get(agentId);
 	if (entry && !entry.sessionId) {
 		entry.sessionId = sessionId;

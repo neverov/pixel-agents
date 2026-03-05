@@ -10,12 +10,14 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.78.0",
     "express": "^5.1.0",
+    "pg": "^8.20.0",
     "ws": "^8.18.0"
   },
   "devDependencies": {
     "@types/express": "^5.0.0",
-    "@types/ws": "^8.5.13",
     "@types/node": "22.x",
+    "@types/pg": "^8.18.0",
+    "@types/ws": "^8.5.13",
     "typescript": "^5.9.3"
   }
 }

@@ -1,5 +1,6 @@
 import { WebSocket } from 'ws';
 import type { AgentState } from './types.js';
+import { resolveAgentId } from './db/agentsRepo.js';
 import { getPersonaForSession } from './prompts/personas.js';
 
 const ADJECTIVES = [
@@ -68,7 +69,7 @@ function sendTo(ws: WebSocket, msg: unknown): void {
 /**
  * Handle a peer protocol message. Returns true if the message was handled.
  */
-export function handlePeerMessage(ws: WebSocket, msg: Record<string, unknown>, ctx: PeerContext): boolean {
+export async function handlePeerMessage(ws: WebSocket, msg: Record<string, unknown>, ctx: PeerContext): Promise<boolean> {
 	const type = msg.type as string;
 	if (!type?.startsWith('peer')) return false;
 
@@ -94,7 +95,14 @@ export function handlePeerMessage(ws: WebSocket, msg: Record<string, unknown>, c
 	if (type === 'peerAgentCreated') {
 		const sessionId = msg.sessionId as string | undefined;
 		const agentName = generateAgentName();
-		const globalId = ctx.nextAgentIdRef.current++;
+
+		let globalId: number;
+		if (sessionId) {
+			const resolved = await resolveAgentId(sessionId, ctx.nextAgentIdRef);
+			globalId = resolved.id;
+		} else {
+			globalId = ctx.nextAgentIdRef.current++;
+		}
 		peer.agentIdMap.set(localId, globalId);
 
 		const agent: AgentState = {
@@ -146,7 +154,6 @@ export function handlePeerMessage(ws: WebSocket, msg: Record<string, unknown>, c
 
 	if (type === 'peerAgentToolStart') {
 		ctx.emit({ type: 'agentToolStart', id: globalId, toolId: msg.toolId, status: msg.status });
-		// Track on AgentState for late-joining browsers
 		const agent = ctx.agents.get(globalId);
 		if (agent) {
 			const toolId = msg.toolId as string;

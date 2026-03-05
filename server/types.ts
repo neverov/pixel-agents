@@ -33,10 +33,19 @@ export interface AgentState {
 	peerName?: string;
 }
 
+/** Extract session UUID from a JSONL file path */
+export function sessionIdFromFile(jsonlFile: string): string {
+	const base = jsonlFile.lastIndexOf('/');
+	const name = base >= 0 ? jsonlFile.slice(base + 1) : jsonlFile;
+	return name.endsWith('.jsonl') ? name.slice(0, -6) : name;
+}
+
 export interface PersistedAgent {
 	id: number;
 	jsonlFile: string;
 	projectDir: string;
 	label?: string;
 	customLabel?: string;
+	sessionId?: string;
+	persona?: string;
 }

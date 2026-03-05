@@ -333,6 +333,18 @@ export function useServerMessages(
           const next = [...prev, chatMsg]
           return next.length > CHAT_MAX_MESSAGES ? next.slice(-CHAT_MAX_MESSAGES) : next
         })
+      } else if (msg.type === 'chatHistory') {
+        const messages = msg.messages as Array<{ agentId: number; sender: string; text: string; timestamp: number }>
+        setChatMessages((prev) => {
+          if (prev.length > 0) return prev // Don't overwrite if we already have messages
+          const mapped: ChatMessage[] = messages.map((m) => ({
+            agentId: m.agentId,
+            sender: m.sender,
+            text: m.text,
+            timestamp: m.timestamp,
+          }))
+          return mapped.length > CHAT_MAX_MESSAGES ? mapped.slice(-CHAT_MAX_MESSAGES) : mapped
+        })
       } else if (msg.type === 'settingsLoaded') {
         const soundOn = msg.soundEnabled as boolean
         setSoundEnabled(soundOn)

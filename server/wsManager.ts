@@ -3,8 +3,8 @@ import type { Server } from 'http';
 
 let wss: WebSocketServer;
 const clients = new Set<WebSocket>();
-let onClientMessage: ((msg: Record<string, unknown>, ws: WebSocket) => void) | null = null;
-let onClientConnect: ((ws: WebSocket) => void) | null = null;
+let onClientMessage: ((msg: Record<string, unknown>, ws: WebSocket) => void | Promise<void>) | null = null;
+let onClientConnect: ((ws: WebSocket) => void | Promise<void>) | null = null;
 let onClientDisconnect: ((ws: WebSocket) => void) | null = null;
 
 export function initWebSocket(server: Server): void {
@@ -51,7 +51,7 @@ export function sendTo(ws: WebSocket, msg: unknown): void {
 }
 
 /** Register handler for incoming client messages */
-export function setMessageHandler(handler: (msg: Record<string, unknown>, ws: WebSocket) => void): void {
+export function setMessageHandler(handler: (msg: Record<string, unknown>, ws: WebSocket) => void | Promise<void>): void {
 	onClientMessage = handler;
 }
 
@@ -61,7 +61,7 @@ export function setDisconnectHandler(handler: (ws: WebSocket) => void): void {
 }
 
 /** Register handler for new client connections (to send initial state) */
-export function setConnectHandler(handler: (ws: WebSocket) => void): void {
+export function setConnectHandler(handler: (ws: WebSocket) => void | Promise<void>): void {
 	onClientConnect = handler;
 }
 

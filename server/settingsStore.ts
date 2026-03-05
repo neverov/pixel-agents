@@ -1,8 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { LAYOUT_FILE_DIR, SETTINGS_FILE_NAME, AGENTS_FILE_NAME } from './constants.js';
-import type { PersistedAgent } from './types.js';
+import { LAYOUT_FILE_DIR, SETTINGS_FILE_NAME } from './constants.js';
 
 function getDataDir(): string {
 	return path.join(os.homedir(), LAYOUT_FILE_DIR);
@@ -62,21 +61,3 @@ export function setAgentSeats(seats: Settings['agentSeats']): void {
 	writeSettings({ agentSeats: seats });
 }
 
-// -- Persisted Agents --
-
-export function readPersistedAgents(): PersistedAgent[] {
-	try {
-		const filePath = path.join(getDataDir(), AGENTS_FILE_NAME);
-		if (!fs.existsSync(filePath)) return [];
-		const raw = fs.readFileSync(filePath, 'utf-8');
-		return JSON.parse(raw) as PersistedAgent[];
-	} catch {
-		return [];
-	}
-}
-
-export function writePersistedAgents(agents: PersistedAgent[]): void {
-	ensureDir();
-	const filePath = path.join(getDataDir(), AGENTS_FILE_NAME);
-	fs.writeFileSync(filePath, JSON.stringify(agents, null, 2), 'utf-8');
-}
