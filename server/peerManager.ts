@@ -3,6 +3,7 @@ import type { AgentState } from './types.js';
 import { resolveAgentId } from './db/agentsRepo.js';
 import { getPersona } from './prompts/personas.js';
 import { sendTo } from './wsManager.js';
+import { feedAgentText } from './chatSummarizer.js';
 
 const ADJECTIVES = [
 	'brave', 'cosmic', 'turbo', 'swift', 'neon', 'pixel', 'cyber', 'mega',
@@ -49,6 +50,7 @@ export interface PeerContext {
 	agents: Map<number, AgentState>;
 	emit: (msg: unknown) => void;
 	persistAgents: () => void;
+	onChatSummary: (agentId: number, sender: string, summary: string) => void;
 }
 
 function findPeer(ws: WebSocket): PeerState | null {
@@ -202,7 +204,10 @@ export async function handlePeerMessage(ws: WebSocket, msg: Record<string, unkno
 	} else if (type === 'peerAgentTokens') {
 		ctx.emit({ type: 'agentTokens', id: globalId, input: msg.input, output: msg.output, cacheRead: msg.cacheRead, cacheCreation: msg.cacheCreation });
 	} else if (type === 'peerAgentText') {
-		ctx.emit({ type: 'agentText', id: globalId, text: msg.text });
+		// Don't broadcast raw text — feed to summarizer only
+		const agent = ctx.agents.get(globalId);
+		const name = agent?.label || `Agent ${globalId}`;
+		feedAgentText(globalId, msg.text as string, name, agent?.persona, ctx.onChatSummary);
 	}
 
 	return true;

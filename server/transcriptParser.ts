@@ -12,7 +12,7 @@ import {
 	BASH_COMMAND_DISPLAY_MAX_LENGTH,
 	TASK_DESCRIPTION_DISPLAY_MAX_LENGTH,
 } from './constants.js';
-import { maskPaths } from './pathMasking.js';
+import { maskPaths, redactSecrets } from './pathMasking.js';
 
 export const PERMISSION_EXEMPT_TOOLS = new Set(['Task', 'AskUserQuestion']);
 
@@ -24,7 +24,7 @@ export function formatToolStatus(toolName: string, input: Record<string, unknown
 		case 'Bash': {
 			const cmd = (input.command as string) || '';
 			const truncated = cmd.length > BASH_COMMAND_DISPLAY_MAX_LENGTH ? cmd.slice(0, BASH_COMMAND_DISPLAY_MAX_LENGTH) + '\u2026' : cmd;
-			return `Running: ${maskPaths(truncated)}`;
+			return `Running: ${redactSecrets(maskPaths(truncated))}`;
 		}
 		case 'Glob': return 'Searching files';
 		case 'Grep': return 'Searching code';
@@ -33,7 +33,7 @@ export function formatToolStatus(toolName: string, input: Record<string, unknown
 		case 'Task': {
 			const desc = typeof input.description === 'string' ? input.description : '';
 			const truncated = desc.length > TASK_DESCRIPTION_DISPLAY_MAX_LENGTH ? desc.slice(0, TASK_DESCRIPTION_DISPLAY_MAX_LENGTH) + '\u2026' : desc;
-			return truncated ? `Subtask: ${maskPaths(truncated)}` : 'Running subtask';
+			return truncated ? `Subtask: ${redactSecrets(maskPaths(truncated))}` : 'Running subtask';
 		}
 		case 'AskUserQuestion': return 'Waiting for your answer';
 		case 'EnterPlanMode': return 'Planning';

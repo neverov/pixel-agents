@@ -15,7 +15,7 @@ import { readSettings, setAgentSeats, setSoundEnabled } from './settingsStore.js
 import { DEFAULT_PORT } from './constants.js';
 import { feedAgentText, flushAgent } from './chatSummarizer.js';
 import { getPersona } from './prompts/personas.js';
-import { maskPaths } from './pathMasking.js';
+import { maskPaths, redactSecrets } from './pathMasking.js';
 import { initDb, closeDb } from './db.js';
 import { appendChatMessage, getChatMessages } from './db/chatRepo.js';
 
@@ -99,31 +99,36 @@ const peerCtx: PeerContext = {
 	agents,
 	emit: broadcast,
 	persistAgents,
+	onChatSummary,
 };
 
 // -- Chat summarizer callback --
 function onChatSummary(agentId: number, sender: string, summary: string): void {
-	broadcast({ type: 'chatMessage', agentId, sender, text: maskPaths(summary), timestamp: Date.now() });
-	void appendChatMessage({ agentId, sender, text: summary }).catch(err => console.error('[Chat] Persist failed:', err));
+	const sanitized = redactSecrets(maskPaths(summary));
+	broadcast({ type: 'chatMessage', agentId, sender, text: sanitized, timestamp: Date.now() });
+	void appendChatMessage({ agentId, sender, text: sanitized }).catch(err => console.error('[Chat] Persist failed:', err));
 }
 
 // -- Intercept agentText from emit for chat summarization --
 const originalBroadcast = broadcast;
 function instrumentedBroadcast(msg: unknown): void {
-	originalBroadcast(msg);
 	const m = msg as Record<string, unknown>;
 	if (m.type === 'agentText') {
+		// Don't broadcast raw agent text to clients — feed to summarizer only
 		const agentId = m.id as number;
 		const text = m.text as string;
 		const agent = agents.get(agentId);
 		const name = agent?.label || `Agent ${agentId}`;
 		feedAgentText(agentId, text, name, agent?.persona, onChatSummary);
-	} else if (m.type === 'agentStatus' && m.status === 'waiting') {
+		return;
+	}
+	if (m.type === 'agentStatus' && m.status === 'waiting') {
 		const agentId = m.id as number;
 		const agent = agents.get(agentId);
 		const name = agent?.label || `Agent ${agentId}`;
 		flushAgent(agentId, name, agent?.persona, onChatSummary);
 	}
+	originalBroadcast(msg);
 }
 peerCtx.emit = instrumentedBroadcast;
 

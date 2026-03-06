@@ -11,6 +11,7 @@ import { WebSocket } from 'ws';
 import type { AgentState } from '../server/types.js';
 import { processTranscriptLine } from '../server/transcriptParser.js';
 import { cancelWaitingTimer, cancelPermissionTimer } from '../server/timerManager.js';
+import { maskPaths, redactSecrets } from '../server/pathMasking.js';
 import {
 	SESSION_SCAN_INTERVAL_MS,
 	SESSION_ACTIVE_THRESHOLD_MS,
@@ -103,7 +104,7 @@ function createPeerEmit(localId: number): (msg: unknown) => void {
 				send({ type: 'peerAgentTokens', localId, input: m.input, output: m.output, cacheRead: m.cacheRead, cacheCreation: m.cacheCreation });
 				break;
 			case 'agentText':
-				send({ type: 'peerAgentText', localId, text: m.text });
+				send({ type: 'peerAgentText', localId, text: redactSecrets(maskPaths(m.text as string)) });
 				break;
 		}
 	};
