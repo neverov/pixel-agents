@@ -29,6 +29,9 @@ export const CHAT_SUMMARY_MAX_TOKENS = 60;
 export const CHAT_PERSIST_MAX = 500;
 export const CHAT_CLEANUP_EVERY = 50;
 
+// -- Token Usage --
+export const TOKEN_FLUSH_INTERVAL_MS = 30_000;
+
 // -- Server --
 export const DEFAULT_PORT = 3000;
 export const TERMINAL_NAME_PREFIX = 'Claude Code';

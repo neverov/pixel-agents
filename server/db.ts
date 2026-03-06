@@ -56,6 +56,17 @@ export async function initDb(): Promise<void> {
 		)
 	`);
 
+	await p.query(`
+		CREATE TABLE IF NOT EXISTS token_usage (
+			agent_id       INTEGER PRIMARY KEY,
+			input_tokens   BIGINT NOT NULL DEFAULT 0,
+			output_tokens  BIGINT NOT NULL DEFAULT 0,
+			cache_read     BIGINT NOT NULL DEFAULT 0,
+			cache_creation BIGINT NOT NULL DEFAULT 0,
+			updated_at     TIMESTAMPTZ DEFAULT now()
+		)
+	`);
+
 	// Migration: add columns if they don't exist (for existing DBs)
 	await p.query(`
 		DO $$ BEGIN

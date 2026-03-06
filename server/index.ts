@@ -12,18 +12,48 @@ import { persistAgents as doPersistAgents } from './agentManager.js';
 import { loadLayout, watchLayoutFile, writeLayoutToFile, readLayoutFromFile } from './layoutPersistence.js';
 import type { LayoutWatcher } from './layoutPersistence.js';
 import { readSettings, setAgentSeats, setSoundEnabled } from './settingsStore.js';
-import { DEFAULT_PORT } from './constants.js';
+import { DEFAULT_PORT, TOKEN_FLUSH_INTERVAL_MS } from './constants.js';
 import { feedAgentText, flushAgent } from './chatSummarizer.js';
 import { getPersona } from './prompts/personas.js';
 import { maskPaths, redactSecrets } from './pathMasking.js';
 import { initDb, closeDb } from './db.js';
 import { appendChatMessage, getChatMessages } from './db/chatRepo.js';
+import { flushTokenDeltas, getTokenTotals } from './db/tokenRepo.js';
+import type { TokenDelta } from './db/tokenRepo.js';
 
 // -- Shared state --
 const agents = new Map<number, AgentState>();
 const nextAgentIdRef = { current: 1 };
 
 let layoutWatcher: LayoutWatcher | null = null;
+
+// -- Token usage accumulator --
+const tokenDeltas = new Map<number, TokenDelta>();
+
+function accumulateTokens(agentId: number, input: number, output: number, cacheRead: number, cacheCreation: number): void {
+	const cur = tokenDeltas.get(agentId);
+	if (cur) {
+		cur.input += input;
+		cur.output += output;
+		cur.cacheRead += cacheRead;
+		cur.cacheCreation += cacheCreation;
+	} else {
+		tokenDeltas.set(agentId, { agentId, input, output, cacheRead, cacheCreation });
+	}
+}
+
+async function flushTokens(): Promise<void> {
+	if (tokenDeltas.size === 0) return;
+	const deltas = [...tokenDeltas.values()];
+	tokenDeltas.clear();
+	try {
+		await flushTokenDeltas(deltas);
+	} catch (err) {
+		// Put deltas back on failure so they'll be retried next flush
+		for (const d of deltas) accumulateTokens(d.agentId, d.input, d.output, d.cacheRead, d.cacheCreation);
+		console.error('[Tokens] Flush failed:', err);
+	}
+}
 
 const port = parseInt(process.env.PORT || String(DEFAULT_PORT), 10);
 
@@ -122,6 +152,15 @@ function instrumentedBroadcast(msg: unknown): void {
 		feedAgentText(agentId, text, name, agent?.persona, onChatSummary);
 		return;
 	}
+	if (m.type === 'agentTokens') {
+		accumulateTokens(
+			m.id as number,
+			m.input as number,
+			m.output as number,
+			m.cacheRead as number,
+			m.cacheCreation as number,
+		);
+	}
 	if (m.type === 'agentStatus' && m.status === 'waiting') {
 		const agentId = m.id as number;
 		const agent = agents.get(agentId);
@@ -173,6 +212,29 @@ setConnectHandler(async (ws) => {
 		sendTo(ws, { type: 'chatHistory', messages: chatHistory });
 	}
 
+	// Send historical token totals (DB + unflushed deltas)
+	const dbTotals = await getTokenTotals();
+	const tokenMap = new Map<number, { input: number; output: number; cacheRead: number; cacheCreation: number }>();
+	for (const t of dbTotals) {
+		tokenMap.set(t.agentId, { input: t.input, output: t.output, cacheRead: t.cacheRead, cacheCreation: t.cacheCreation });
+	}
+	for (const [agentId, d] of tokenDeltas) {
+		const cur = tokenMap.get(agentId);
+		if (cur) {
+			cur.input += d.input;
+			cur.output += d.output;
+			cur.cacheRead += d.cacheRead;
+			cur.cacheCreation += d.cacheCreation;
+		} else {
+			tokenMap.set(agentId, { input: d.input, output: d.output, cacheRead: d.cacheRead, cacheCreation: d.cacheCreation });
+		}
+	}
+	if (tokenMap.size > 0) {
+		const totals: Record<number, { input: number; output: number; cacheRead: number; cacheCreation: number }> = {};
+		for (const [id, t] of tokenMap) totals[id] = t;
+		sendTo(ws, { type: 'tokenHistory', totals });
+	}
+
 	// Send existing agents (all remote, from peers)
 	const agentIds = [...agents.keys()].sort((a, b) => a - b);
 	const agentSeats = settings.agentSeats || {};
@@ -206,6 +268,9 @@ setConnectHandler(async (ws) => {
 	sendTo(ws, { type: 'layoutLoaded', layout });
 });
 
+// -- Token flush timer --
+const tokenFlushTimer = setInterval(() => void flushTokens(), TOKEN_FLUSH_INTERVAL_MS);
+
 // -- Start server --
 void initDb().then(() => {
 	server.listen(port, () => {
@@ -217,11 +282,14 @@ void initDb().then(() => {
 // -- Graceful shutdown --
 function cleanup(): void {
 	console.log('\n[Pixel Office] Shutting down...');
+	clearInterval(tokenFlushTimer);
 	layoutWatcher?.dispose();
 	disposeWs();
-	void closeDb();
-	server.close();
-	process.exit(0);
+	void flushTokens().finally(() => {
+		void closeDb();
+		server.close();
+		process.exit(0);
+	});
 }
 
 process.on('SIGINT', cleanup);

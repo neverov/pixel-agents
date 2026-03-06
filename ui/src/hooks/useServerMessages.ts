@@ -322,6 +322,27 @@ export function useServerMessages(
             },
           }
         })
+      } else if (msg.type === 'tokenHistory') {
+        const totals = msg.totals as Record<number, { input: number; output: number; cacheRead: number; cacheCreation: number }>
+        setAgentTokens((prev) => {
+          const next = { ...prev }
+          for (const [idStr, t] of Object.entries(totals)) {
+            const id = Number(idStr)
+            const cur = next[id]
+            if (cur) {
+              // Merge: historical + any deltas already accumulated this session
+              next[id] = {
+                input: t.input + cur.input,
+                output: t.output + cur.output,
+                cacheRead: t.cacheRead + cur.cacheRead,
+                cacheCreation: t.cacheCreation + cur.cacheCreation,
+              }
+            } else {
+              next[id] = { input: t.input, output: t.output, cacheRead: t.cacheRead, cacheCreation: t.cacheCreation }
+            }
+          }
+          return next
+        })
       } else if (msg.type === 'chatMessage') {
         const chatMsg: ChatMessage = {
           sender: msg.sender as string,
