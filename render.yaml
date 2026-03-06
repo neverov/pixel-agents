@@ -1,10 +1,3 @@
-databases:
-  - name: pixel-agents-db
-    plan: starter
-    databaseName: pixel_agents
-    user: pixel
-    region: frankfurt
-
 services:
   - type: web
     name: pixel-office
@@ -17,6 +10,4 @@ services:
       - key: ANTHROPIC_API_KEY
         sync: false
       - key: DATABASE_URL
-        fromDatabase:
-          name: pixel-agents-db
-          property: connectionString
+        sync: false
