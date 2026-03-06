@@ -97,7 +97,7 @@ export function AgentLabels({
           dotColor = '#3794ff'
         }
 
-        const rawLabel = subLabelMap.get(id) || `Agent #${id}`
+        const rawLabel = subLabelMap.get(id) || ch.folderName || `Agent #${id}`
         const colonIdx = rawLabel.indexOf(': ')
         const agentName = colonIdx >= 0 ? rawLabel.slice(colonIdx + 2) : rawLabel
         const peerName = colonIdx >= 0 ? rawLabel.slice(0, colonIdx) : null
